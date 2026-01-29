@@ -39,32 +39,6 @@ jobs:
       - name: Run aiken check
         run: aiken check
 
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./onchain
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Aiken
-        uses: aiken-lang/setup-aiken@v1
-        with:
-          version: v1.1.21
-
-      - name: Cache Aiken build
-        uses: actions/cache@v4
-        with:
-          path: |
-            onchain/build
-            onchain/.aiken
-          key: ${{ runner.os }}-aiken-${{ hashFiles('onchain/aiken.lock') }}
-
-      - name: Run tests
-        run: aiken test
-
   build:
     name: Build
     runs-on: ubuntu-latest
