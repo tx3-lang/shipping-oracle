@@ -116,13 +116,13 @@ config:
     curve: stepBefore
 ---
 flowchart LR
-  I1@{ shape: brace-r, label: "Customer wallet<br/>━━━━━━━━━━<br/>Address: Customer<br/>Value: (N + minADA) ADA" }
+  I1@{ shape: brace-r, label: "Customer wallet<br/>━━━━━━━━━━━━<br/>Address: Customer<br/>Value: (N + minADA) ADA" }
 
   TX@{ label: "<br/><br/><br/><br/><br/><br/><br/><br/><br/>&nbsp;&nbsp;&nbsp;&nbsp;Track Shipment&nbsp;&nbsp;&nbsp;&nbsp;<br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>"}
 
-  O1@{ shape: brace-l, label: "Tracking UTxO<br/>━━━━━━━━━━<br/>Address: Validator<br/>Value: (N + minADA) ADA<br/>Datum: TrackingDatum<br/>{ carrier, tracking_number, outbox_address}"}
+  O1@{ shape: brace-l, label: "Tracking UTxO<br/>━━━━━━━━━━━━━<br/>Address: Validator<br/>Value: (N + minADA) ADA<br/>Datum: TrackingDatum<br/>{ carrier, tracking_number, outbox_address}"}
 
-  O2@{ shape: brace-l, label: "Change UTxO<br/>━━━━━━━━━━<br/>Address: Customer<br/>Value: K ADA"}
+  O2@{ shape: brace-l, label: "Change UTxO<br/>━━━━━━━━━━━━━━<br/>Address: Customer<br/>Value: K ADA"}
 
   I1 --> TX
   TX --> O1
@@ -183,13 +183,13 @@ config:
     curve: stepBefore
 ---
 flowchart LR
-  I1@{ shape: brace-r, label: "Tracking UTxO<br/>━━━━━━━━━━<br/>Address: Validator<br/>Value: (N + minADA) ADA<br/>Datum: TrackingDatum<br/>{ carrier, tracking_number, outbox_address}"}
+  I1@{ shape: brace-r, label: "Tracking UTxO<br/>━━━━━━━━━━━━━━<br/>Address: Validator<br/>Value: (N + minADA) ADA<br/>Datum: TrackingDatum<br/>{ carrier, tracking_number, outbox_address}"}
 
-  TX["`<br/><br/><br/><br/><br/>Close Shipment<br/><br/>━━━━━━━━━━━━━━━━━━<br/>**Validates**<br/>✓ Oracle signature present<br/>✓ Status is valid<br/>(_DELIVERED_ / _NOT_DELIVERED_)<br/>✓ Payment ≥ tracking_price<br/>✓ Shipment datum matches tracking<br/>✓ Two outputs only<br/><br/><br/><br/><br/><br/><br/>`"]
+  TX["`<br/><br/><br/><br/><br/>Close Shipment<br/>━━━━━━━━━━━━━━━━━<br/>**Validates**<br/>✓ Oracle signature present<br/>✓ Status is valid<br/>(_DELIVERED_ / _NOT_DELIVERED_)<br/>✓ Payment ≥ tracking_price<br/>✓ Shipment datum matches tracking<br/>✓ Two outputs only<br/><br/><br/><br/><br/><br/><br/>`"]
 
-  O1@{ shape: brace-l, label: "Shipment UTxO<br/>━━━━━━━━━━<br/>Address: Outbox<br/>Value: minADA ADA<br/>Datum: ShipmentDatum<br/>{carrier, tracking_number,<br/>status, timestamp, oracle_pkh}"}
+  O1@{ shape: brace-l, label: "Shipment UTxO<br/>━━━━━━━━━━━━━━<br/>Address: Outbox<br/>Value: minADA ADA<br/>Datum: ShipmentDatum<br/>{carrier, tracking_number,<br/>status, timestamp, oracle_pkh}"}
 
-  O2@{ shape: brace-l, label: "Payment UTxO<br/>━━━━━━━━━━<br/>Address: Payment<br/>Value: N ADA<br/>Datum: None"}
+  O2@{ shape: brace-l, label: "Payment UTxO<br/>━━━━━━━━━━━━━━<br/>Address: Payment<br/>Value: N ADA<br/>Datum: None"}
 
   I1 --ConsumeTracking--> TX
   TX --> O1
