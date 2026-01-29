@@ -1,0 +1,20 @@
+name = "tx3-lang/shipping-oracle"
+version = "0.1.0"
+compiler = "v1.1.21"
+plutus = "v3"
+license = "Apache-2.0"
+description = "Shipment tracking validator for Cardano blockchain"
+
+[repository]
+user = "tx3-lang"
+project = "shipping-oracle"
+platform = "github"
+
+[[dependencies]]
+name = "aiken-lang/stdlib"
+version = "v3"
+source = "github"
+
+[config.default]
+tracking_price = 10000000
+payment_address = "addr1..."

@@ -1,0 +1,12 @@
+[protocol]
+name = "shipping-oracle"
+scope = "tx3-lang"
+version = "0.0.0"
+description = ""
+main = "main.tx3"
+
+[ledger]
+family = "cardano"
+
+[[codegen]]
+plugin = "rust-client"

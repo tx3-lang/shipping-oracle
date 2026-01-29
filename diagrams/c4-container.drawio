@@ -1,0 +1,136 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36" version="29.1.1">
+  <diagram name="Página-1" id="6YgkF8tk9Sgb5htmZWwW">
+    <mxGraphModel dx="2272" dy="1239" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1080" pageHeight="720" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="mIYZZHH6ZjEX_6uKxGFi-1" parent="1" style="rounded=1;fillColor=none;verticalAlign=middle;glass=0;shadow=1;strokeWidth=2;fontFamily=Helvetica;fontSize=16;whiteSpace=wrap;html=1;spacing=0;spacingTop=0;labelPosition=center;verticalLabelPosition=middle;align=center;arcSize=6;" value="" vertex="1">
+          <mxGeometry height="240" width="880" x="40" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="mIYZZHH6ZjEX_6uKxGFi-11" edge="1" parent="1" source="mIYZZHH6ZjEX_6uKxGFi-41" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=open;endFill=0;curved=0;strokeWidth=2;jumpStyle=none;shadow=0;flowAnimation=0;labelBackgroundColor=none;fontSize=12;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" target="mIYZZHH6ZjEX_6uKxGFi-36">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="200" y="200" />
+              <mxPoint x="760" y="200" />
+            </Array>
+            <mxPoint x="440" y="190" as="sourcePoint" />
+            <mxPoint x="680" y="190" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mIYZZHH6ZjEX_6uKxGFi-12" connectable="0" parent="mIYZZHH6ZjEX_6uKxGFi-11" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=12;" value="&lt;font style=&quot;font-size: 13px;&quot;&gt;&amp;nbsp;Builds track_shipment transaction&amp;nbsp;&lt;/font&gt;" vertex="1">
+          <mxGeometry relative="1" x="0.0214" as="geometry">
+            <mxPoint x="-48" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mIYZZHH6ZjEX_6uKxGFi-5" parent="1" style="rounded=0;fillColor=none;verticalAlign=middle;glass=0;shadow=1;strokeWidth=2;fontFamily=Helvetica;fontSize=14;whiteSpace=wrap;html=1;spacing=6;spacingTop=0;labelPosition=center;verticalLabelPosition=middle;align=center;" value="&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;Data Fetcher&lt;/font&gt;&lt;/b&gt;&lt;div&gt;&lt;i&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;[Component: Rust]&lt;/font&gt;&lt;/i&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;font-size: 13px;&quot;&gt;Polls tracking UTxOs, queries Shippo API, submits close-shipment transactions&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="120" width="240" x="80" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="mIYZZHH6ZjEX_6uKxGFi-9" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontSize=16;" value="&lt;b&gt;Shipping Oracle&lt;/b&gt;&lt;div&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;&lt;i style=&quot;&quot;&gt;[Software System]&lt;/i&gt;&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="880" x="40" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="mIYZZHH6ZjEX_6uKxGFi-35" parent="1" style="rounded=0;fillColor=none;verticalAlign=middle;glass=0;shadow=1;strokeWidth=2;fontFamily=Helvetica;fontSize=14;whiteSpace=wrap;html=1;spacing=6;spacingTop=0;labelPosition=center;verticalLabelPosition=middle;align=center;" value="&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;On-chain Validator&lt;/font&gt;&lt;/b&gt;&lt;div&gt;&lt;i&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;[Component: Aiken]&lt;/font&gt;&lt;/i&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;font-size: 13px;&quot;&gt;Validates tracking UTxO spends and enforces oracle payment&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="120" width="240" x="360" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="mIYZZHH6ZjEX_6uKxGFi-36" parent="1" style="rounded=0;fillColor=none;verticalAlign=middle;glass=0;shadow=1;strokeWidth=2;fontFamily=Helvetica;fontSize=14;whiteSpace=wrap;html=1;spacing=6;spacingTop=0;labelPosition=center;verticalLabelPosition=middle;align=center;" value="&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;Tx3 Protocol&lt;/font&gt;&lt;/b&gt;&lt;div&gt;&lt;i&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;[Component: Tx3]&lt;/font&gt;&lt;/i&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;font-size: 13px;&quot;&gt;Defines track_shipment, and close_shipment transactions&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="120" width="240" x="640" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="mIYZZHH6ZjEX_6uKxGFi-37" parent="1" style="rounded=0;fillColor=none;verticalAlign=middle;glass=0;shadow=1;strokeWidth=2;fontFamily=Helvetica;fontSize=14;whiteSpace=wrap;html=1;spacing=6;spacingTop=0;labelPosition=center;verticalLabelPosition=middle;align=center;" value="&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;Shippo API&lt;/font&gt;&lt;/b&gt;&lt;div&gt;&lt;i&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;[External System]&lt;/font&gt;&lt;/i&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;font-size: 13px;&quot;&gt;Real-world shipment tracking status&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="120" width="240" x="80" y="560" as="geometry" />
+        </mxCell>
+        <mxCell id="mIYZZHH6ZjEX_6uKxGFi-38" parent="1" style="rounded=0;fillColor=none;verticalAlign=middle;glass=0;shadow=1;strokeWidth=2;fontFamily=Helvetica;fontSize=14;whiteSpace=wrap;html=1;spacing=6;spacingTop=0;labelPosition=center;verticalLabelPosition=middle;align=center;" value="&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;Blockfrost API&lt;/font&gt;&lt;/b&gt;&lt;div&gt;&lt;i&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;[External System]&lt;/font&gt;&lt;/i&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;font-size: 13px;&quot;&gt;Cardano blockchain queries and transaction submission&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="120" width="240" x="640" y="560" as="geometry" />
+        </mxCell>
+        <mxCell id="mIYZZHH6ZjEX_6uKxGFi-39" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;strokeWidth=2;shadow=1;fillColor=none;" value="&lt;b style=&quot;font-size: 14px;&quot;&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;Cardano Ledger&lt;/font&gt;&lt;/b&gt;&lt;div style=&quot;font-size: 14px;&quot;&gt;&lt;i&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;[External System]&lt;/font&gt;&lt;/i&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 14px;&quot;&gt;&lt;font style=&quot;font-size: 13px;&quot;&gt;Stores UTxOs and executes scripts&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="120" width="240" x="640" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="mIYZZHH6ZjEX_6uKxGFi-42" connectable="0" parent="1" style="group" value="" vertex="1">
+          <mxGeometry height="120" width="240" x="80" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="mIYZZHH6ZjEX_6uKxGFi-40" parent="mIYZZHH6ZjEX_6uKxGFi-42" style="shape=actor;whiteSpace=wrap;html=1;fillColor=none;shadow=1;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="50" width="40" x="100" y="13" as="geometry" />
+        </mxCell>
+        <mxCell id="mIYZZHH6ZjEX_6uKxGFi-41" parent="mIYZZHH6ZjEX_6uKxGFi-42" style="rounded=0;fillColor=none;verticalAlign=middle;glass=0;shadow=1;strokeWidth=2;fontFamily=Helvetica;fontSize=14;whiteSpace=wrap;html=1;spacing=6;spacingTop=0;labelPosition=center;verticalLabelPosition=middle;align=center;" value="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;Customer&lt;/font&gt;&lt;/b&gt;&lt;div&gt;&lt;i&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;[Person]&lt;/font&gt;&lt;/i&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="120" width="240" as="geometry" />
+        </mxCell>
+        <mxCell id="mIYZZHH6ZjEX_6uKxGFi-43" edge="1" parent="1" source="mIYZZHH6ZjEX_6uKxGFi-41" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;endFill=0;curved=0;strokeWidth=2;jumpStyle=none;shadow=0;flowAnimation=0;labelBackgroundColor=none;fontSize=12;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;" target="mIYZZHH6ZjEX_6uKxGFi-39">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="560" y="100" />
+              <mxPoint x="560" y="100" />
+            </Array>
+            <mxPoint x="450" y="60" as="sourcePoint" />
+            <mxPoint x="560" y="160" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mIYZZHH6ZjEX_6uKxGFi-44" connectable="0" parent="mIYZZHH6ZjEX_6uKxGFi-43" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=12;" value="&lt;span style=&quot;font-size: 13px;&quot;&gt;&amp;nbsp;Submits track_shipment transaction&amp;nbsp;&lt;/span&gt;" vertex="1">
+          <mxGeometry relative="1" x="0.0214" as="geometry">
+            <mxPoint x="-3" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mIYZZHH6ZjEX_6uKxGFi-45" edge="1" parent="1" source="mIYZZHH6ZjEX_6uKxGFi-1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;endFill=0;curved=0;strokeWidth=2;jumpStyle=none;shadow=0;flowAnimation=0;labelBackgroundColor=none;fontSize=12;exitX=0.817;exitY=1.002;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="mIYZZHH6ZjEX_6uKxGFi-38">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="759" y="520" />
+              <mxPoint x="760" y="520" />
+            </Array>
+            <mxPoint x="770" y="520" as="sourcePoint" />
+            <mxPoint x="1090" y="520" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mIYZZHH6ZjEX_6uKxGFi-46" connectable="0" parent="mIYZZHH6ZjEX_6uKxGFi-45" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=12;" value="&lt;span style=&quot;font-size: 13px;&quot;&gt;Queries tracking UTxOs / Submits close_shipment transactions&amp;nbsp;&lt;/span&gt;" vertex="1">
+          <mxGeometry relative="1" x="0.0214" as="geometry">
+            <mxPoint x="-3" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mIYZZHH6ZjEX_6uKxGFi-47" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;endFill=0;curved=0;strokeWidth=2;jumpStyle=none;shadow=0;flowAnimation=0;labelBackgroundColor=none;fontSize=12;exitX=0.817;exitY=1.002;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="199.5" y="520" />
+              <mxPoint x="200.5" y="520" />
+            </Array>
+            <mxPoint x="199.5" y="480" as="sourcePoint" />
+            <mxPoint x="200.5" y="560" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mIYZZHH6ZjEX_6uKxGFi-48" connectable="0" parent="mIYZZHH6ZjEX_6uKxGFi-47" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=12;" value="&lt;span style=&quot;font-size: 13px;&quot;&gt;Fetches shipments tracking status&lt;/span&gt;" vertex="1">
+          <mxGeometry relative="1" x="0.0214" as="geometry">
+            <mxPoint x="-3" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mIYZZHH6ZjEX_6uKxGFi-49" parent="1" style="rounded=0;fillColor=none;verticalAlign=middle;glass=0;shadow=1;strokeWidth=2;fontFamily=Helvetica;fontSize=14;whiteSpace=wrap;html=1;spacing=6;spacingTop=0;labelPosition=center;verticalLabelPosition=middle;align=center;" value="&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;TRP Endpoint&lt;/font&gt;&lt;/b&gt;&lt;div&gt;&lt;i&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;[External System]&lt;/font&gt;&lt;/i&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;font-size: 13px;&quot;&gt;Tx3 transaction resolution and building&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="120" width="240" x="360" y="560" as="geometry" />
+        </mxCell>
+        <mxCell id="mIYZZHH6ZjEX_6uKxGFi-50" edge="1" parent="1" source="mIYZZHH6ZjEX_6uKxGFi-1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;endFill=0;curved=0;strokeWidth=2;jumpStyle=none;shadow=0;flowAnimation=0;labelBackgroundColor=none;fontSize=12;entryX=0.5;entryY=0;entryDx=0;entryDy=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="480" y="520" />
+              <mxPoint x="481" y="520" />
+            </Array>
+            <mxPoint x="520" y="540" as="sourcePoint" />
+            <mxPoint x="480.5" y="560" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mIYZZHH6ZjEX_6uKxGFi-51" connectable="0" parent="mIYZZHH6ZjEX_6uKxGFi-50" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=12;" value="&lt;span style=&quot;font-size: 13px;&quot;&gt;Resolves transactions&lt;/span&gt;" vertex="1">
+          <mxGeometry relative="1" x="0.0214" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mIYZZHH6ZjEX_6uKxGFi-53" edge="1" parent="1" source="mIYZZHH6ZjEX_6uKxGFi-38" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;endFill=0;curved=0;strokeWidth=2;jumpStyle=none;shadow=0;flowAnimation=0;labelBackgroundColor=none;fontSize=12;entryX=1;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryPerimeter=0;" target="mIYZZHH6ZjEX_6uKxGFi-39">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1000" y="620" />
+              <mxPoint x="1000" y="100" />
+            </Array>
+            <mxPoint x="770" y="420" as="sourcePoint" />
+            <mxPoint x="770.5" y="500" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mIYZZHH6ZjEX_6uKxGFi-54" connectable="0" parent="mIYZZHH6ZjEX_6uKxGFi-53" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=12;" value="&lt;span style=&quot;font-size: 13px;&quot;&gt;Interfaces with&lt;/span&gt;" vertex="1">
+          <mxGeometry relative="1" x="0.0214" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
