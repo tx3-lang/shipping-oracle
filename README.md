@@ -85,13 +85,12 @@ Creates a tracking request on-chain by locking funds at the validator address.
 
 #### Data Structures
 
-
 **Inputs:**
 - Customer funds UTxO containing sufficient ADA (to cover tracking price deposit + fees + change)
 
 **Outputs:**
 - **Tracking UTxO** (locked at validator address)
-  - Value: tracking price ADA + min UTxO requirement
+  - Value: `TRACKING_PRICE` ADA + min UTxO requirement
   - Datum: `TrackingDatum`
 - **Change UTxO** (returned to customer)
   - Value: Remaining ADA after tracking deposit and fees
@@ -104,6 +103,9 @@ type TrackingDatum {
   outbox_address: Address,      // Where to send final status result
 }
 ```
+
+**Comments:**
+- The `TRACKING_PRICE` value depends on the configured parameter on the on-chain validator. More information [here](onchain/README.md#parameters).
 
 #### Transaction Diagram
 
@@ -139,7 +141,7 @@ Oracle closes the tracking request by consuming the tracking UTxO and emitting t
 
 **Inputs:**
 - **Tracking UTxO** (from validator)
-  - Value: 12 ADA + min UTxO
+  - Value: `TRACKING_PRICE` ADA + min UTxO
   - Datum: `TrackingDatum`
   - Redeemer: `ConsumeTracking`
 
@@ -148,7 +150,7 @@ Oracle closes the tracking request by consuming the tracking UTxO and emitting t
   - Value: min UTxO requirement (~2 ADA)
   - Datum: `ShipmentDatum`
 - **Payment UTxO** (to payment address)
-  - Value: ~10 ADA (tracking deposit minus shipment UTxO value and fees)
+  - Value: `TRACKING_PRICE` ADA (tracking deposit minus shipment UTxO value and fees)
   - Datum: None
 
 **Redeemer:**
@@ -168,6 +170,9 @@ type ShipmentDatum {
   oracle_pkh: VerificationKeyHash, // Oracle's public key hash (for verification)
 }
 ```
+
+**Comments:**
+- The `TRACKING_PRICE` value depends on the configured parameter on the on-chain validator. More information [here](onchain/README.md#parameters).
 
 #### Transaction Diagram
 
