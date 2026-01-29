@@ -122,7 +122,7 @@ flowchart LR
 
   O1@{ shape: brace-l, label: "Tracking UTxO<br/>━━━━━━━━━━━━━<br/>Address: Validator<br/>Value: (N + minADA) ADA<br/>Datum: TrackingDatum<br/>{ carrier, tracking_number, outbox_address}"}
 
-  O2@{ shape: brace-l, label: "Change UTxO<br/>━━━━━━━━━━━━━━<br/>Address: Customer<br/>Value: K ADA"}
+  O2@{ shape: brace-l, label: "Change UTxO<br/>━━━━━━━━━━━━━<br/>Address: Customer<br/>Value: K ADA"}
 
   I1 --> TX
   TX --> O1
