@@ -1,0 +1,121 @@
+party Oracle;
+party Customer;
+party Outbox;
+party Payment;
+
+env {
+    validator_script_bytes: Bytes,
+    validator_script_ref: UtxoRef,
+    oracle_pkh: Bytes,
+}
+
+type TrackingDatum {
+    carrier: Bytes,
+    tracking_number: Bytes,
+    outbox_address: Bytes,
+}
+
+type ShipmentDatum {
+    carrier: Bytes,
+    tracking_number: Bytes,
+    status: Bytes,
+    timestamp: Int,
+    oracle_pkh: Bytes,
+}
+
+type TrackingRedeemer {
+  ConsumeTracking,
+}
+
+tx publish() {
+    locals {
+        quantity: 6000000,
+    }
+
+    input funds {
+        from: Oracle,
+        min_amount: Ada(quantity),
+    }
+    
+    cardano::publish {
+        to: Oracle,
+        amount: Ada(quantity),
+        version: 3,
+        script: validator_script_bytes,
+    }
+
+    output change {
+        to: Oracle,
+        amount: funds - Ada(quantity) - fees,
+    }
+}
+
+tx track_shipment(
+    p_carrier: Bytes,
+    p_tracking_number: Bytes,
+) {
+    locals {
+        quantity: 12000000,
+    }
+
+    reference validator_script {
+        ref: validator_script_ref,
+    }
+
+    input funds {
+        from: Customer,
+        min_amount: fees + Ada(quantity) + min_utxo(tracking),
+    }
+
+    output tracking {
+        to: Oracle,
+        amount: Ada(quantity) + min_utxo(tracking),
+        datum: TrackingDatum {
+            carrier: p_carrier,
+            tracking_number: p_tracking_number,
+            outbox_address: Outbox,
+        },
+    }
+
+    output change {
+        to: Customer,
+        amount: funds - Ada(quantity) - min_utxo(tracking) - fees,
+    }
+}
+
+tx close_shipment(
+    p_utxo_ref: UtxoRef,
+    p_status: Bytes,
+    p_timestamp: Int,
+) {
+    locals {
+        p_oracle_pkh: oracle_pkh,
+    }
+
+    reference validator_script {
+        ref: validator_script_ref,
+    }
+
+    input tracking {
+        ref: p_utxo_ref,
+        datum_is: TrackingDatum,
+        redeemer: TrackingRedeemer::ConsumeTracking {},
+    }
+
+    output shipment {
+        to: Outbox,
+        amount: min_utxo(shipment),
+        datum: ShipmentDatum {
+            carrier: tracking.carrier,
+            tracking_number: tracking.tracking_number,
+            status: p_status,
+            timestamp: p_timestamp,
+            oracle_pkh: p_oracle_pkh,
+        },
+    }
+
+    output change {
+        to: Payment,
+        amount: tracking - min_utxo(shipment) - fees,
+    }
+}
