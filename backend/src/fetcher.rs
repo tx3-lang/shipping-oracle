@@ -16,12 +16,19 @@ impl DataFetcher {
         let shipments = self.blockchain.fetch_shipments().await?;
 
         for shipment in shipments {
-            let tracking_status = self.shipment
+            let shipment_response = self.shipment
                 .fetch_shipment_status(
                     &shipment.datum.carrier,
                     &shipment.datum.tracking_number,
                 )
-                .await?;
+                .await;
+
+            if shipment_response.is_err() {
+                println!("❌ Failed to fetch shipment status for {}/{}: {}", shipment.datum.carrier, shipment.datum.tracking_number, shipment_response.err().unwrap());
+                continue;
+            }
+
+            let tracking_status = shipment_response.unwrap();
 
             println!("🔗 UTxO: {}#{}", shipment.tx_hash, shipment.tx_index);
             println!("🚚 Carrier: {}", shipment.datum.carrier);
@@ -31,14 +38,18 @@ impl DataFetcher {
             let status = get_status(&tracking_status);
 
             if status.is_some() {
-                let tx_hash = self.blockchain
+                let submit_result = self.blockchain
                     .submit_shipment(
                         &shipment,
                         &status.unwrap(),
                     )
-                    .await?;
+                    .await;
 
-                println!("✅ Submitted transaction: {}", tx_hash);
+                if submit_result.is_err() {
+                    println!("❌ Failed to submit transaction: {}", submit_result.err().unwrap());
+                } else{
+                    println!("✅ Submitted transaction: {}", submit_result.unwrap());
+                }
             } else {
                 println!("ℹ️  Status is not final, skipping update");
             }

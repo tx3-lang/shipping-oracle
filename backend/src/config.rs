@@ -6,15 +6,15 @@ use std::env;
 pub struct Config {
     pub cron_schedule: String,
     pub shippo_api_key: String,
-    pub validator_address: String,
     pub validator_script_ref: String,
     pub validator_script_hash: String,
     pub oracle_sk: String,
     pub oracle_pkh: String,
+    pub oracle_address: String,
     pub oracle_payment_address: String,
     pub blockfrost_url: String,
     pub trp_url: String,
-    pub trp_api_key: String,
+    pub trp_api_key: Option<String>,
 }
 
 impl Config {
@@ -23,15 +23,15 @@ impl Config {
     /// # Environment Variables
     /// - `CRON_SCHEDULE`: Optional - Cron expression (default: "0 */5 * * * *")
     /// - `SHIPPO_API_KEY`: Required - Your Shippo API key
-    /// - `VALIDATOR_ADDRESS`: Required - Cardano validator address
     /// - `VALIDATOR_SCRIPT_REF`: Required - Reference script UTXO (TxHash#TxIx)
     /// - `VALIDATOR_SCRIPT_HASH`: Required - Validator script hash (hex-encoded)
     /// - `ORACLE_SK`: Required - Oracle signing key (hex-encoded)
     /// - `ORACLE_PKH`: Required - Oracle public key (hex-encoded)
+    /// - `ORACLE_ADDRESS`: Required - Cardano oracle address
     /// - `ORACLE_PAYMENT_ADDRESS`: Required - Oracle payment address
     /// - `BLOCKFROST_URL`: Required - Blockfrost API URL
     /// - `TRP_URL`: Required - TRP API URL
-    /// - `TRP_API_KEY`: Required - TRP API key
+    /// - `TRP_API_KEY`: Optional - TRP API key
     pub fn from_env() -> Result<Self> {
         // Parse cron schedule (optional, has default)
         let cron_schedule = env::var("CRON_SCHEDULE")
@@ -43,14 +43,6 @@ impl Config {
         
         if shippo_api_key.trim().is_empty() {
             bail!("SHIPPO_API_KEY cannot be empty");
-        }
-
-        // Parse validator address (required)
-        let validator_address = env::var("VALIDATOR_ADDRESS")
-            .context("VALIDATOR_ADDRESS not set")?;
-        
-        if validator_address.trim().is_empty() {
-            bail!("VALIDATOR_ADDRESS cannot be empty");
         }
 
         // Parse validator script reference (required)
@@ -85,6 +77,14 @@ impl Config {
             bail!("ORACLE_PKH cannot be empty");
         }
 
+        // Parse oracle address (required)
+        let oracle_address = env::var("ORACLE_ADDRESS")
+            .context("ORACLE_ADDRESS not set")?;
+        
+        if oracle_address.trim().is_empty() {
+            bail!("ORACLE_ADDRESS cannot be empty");
+        }
+
         // Parse oracle payment address (required)
         let oracle_payment_address = env::var("ORACLE_PAYMENT_ADDRESS")
             .context("ORACLE_PAYMENT_ADDRESS not set")?;
@@ -109,22 +109,23 @@ impl Config {
             bail!("TRP_URL cannot be empty");
         }
 
-        // Parse TRP API key (required)
-        let trp_api_key = env::var("TRP_API_KEY")
-            .context("TRP_API_KEY not set")?;
+        // Parse TRP API key (optional)
+        let trp_api_key = env::var("TRP_API_KEY").ok();
         
-        if trp_api_key.trim().is_empty() {
-            bail!("TRP_API_KEY cannot be empty");
+        if let Some(ref key) = trp_api_key {
+            if key.trim().is_empty() {
+                bail!("TRP_API_KEY cannot be empty");
+            }
         }
 
         Ok(Config {
             cron_schedule,
             shippo_api_key,
-            validator_address,
             validator_script_ref,
             validator_script_hash,
             oracle_sk,
             oracle_pkh,
+            oracle_address,
             oracle_payment_address,
             blockfrost_url,
             trp_url,

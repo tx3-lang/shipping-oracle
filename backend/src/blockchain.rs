@@ -1,12 +1,19 @@
 use anyhow::{Context, Ok, Result, anyhow};
-use pallas_codec::minicbor;
-use pallas_primitives::PlutusData;
-use pallas_addresses::Address;
+use ed25519_dalek::{Signer, SigningKey};
+use pallas::codec::{
+    minicbor,
+    utils::{Bytes, NonEmptySet, KeepRaw},
+};
+use pallas::ledger::{
+    addresses::Address,
+    primitives::{PlutusData, conway::VKeyWitness},
+    traverse::MultiEraTx,
+};
 use reqwest::Client as HttpClient;
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
-use tx3_sdk::trp::ClientOptions;
+use tx3_sdk::trp::{ClientOptions, TxEnvelope};
 
 use crate::config::Config;
 use crate::models::{TrackingUTxO, TrackingDatum};
@@ -90,10 +97,16 @@ pub struct CardanoClient {
 impl CardanoClient {
     pub fn new(config: Config) -> Result<Self> {
         let http_client = HttpClient::new();
+
+        let mut headers = None;
+        if let Some(trp_api_key) = &config.trp_api_key {
+            headers = Some(HashMap::from([("dmtr-api-key".to_string(), trp_api_key.clone())]));
+        }
+
         let tx3_client = Tx3Client::new(
             ClientOptions {
                 endpoint: config.trp_url.clone(),
-                headers: Some(HashMap::from([("dmtr-api-key".to_string(), config.trp_api_key.clone())])),
+                headers,
             }
         );
         
@@ -129,14 +142,14 @@ impl CardanoClient {
         let tx = tx.unwrap();
 
         if !tx.inputs.iter().any(|input| {
-            input.address == self.config.validator_address &&
+            input.address == self.config.oracle_address &&
             input.reference_script_hash.as_deref() == Some(&self.config.validator_script_hash)
         }) {
             return None;
         }
 
         let utxo = tx.outputs.iter().find(|output| {
-            output.address == self.config.validator_address &&
+            output.address == self.config.oracle_address &&
             output.inline_datum.is_some()
         });
 
@@ -165,7 +178,7 @@ impl CardanoClient {
         let url = format!(
             "{}/addresses/{}/transactions",
             self.config.blockfrost_url,
-            self.config.validator_address
+            self.config.oracle_address
         );
         
         let response = self.http_client
@@ -202,20 +215,9 @@ impl CardanoClient {
         tracking: &TrackingUTxO,
         status: &str,
     ) -> Result<String> {
-        let params = CloseShipmentParams {
-            oracle_pkh: self.config.oracle_pkh.clone(),
-            outbox: tracking.datum.outbox_address.to_string(),
-            p_status: hex::encode(status.to_string()),
-            p_timestamp: format!("{}", chrono::Utc::now().timestamp() as u64),
-            p_utxo_ref: format!("{}#{}", tracking.tx_hash, tracking.tx_index),
-            payment: self.config.oracle_payment_address.clone(),
-            validator_script_ref: self.config.validator_script_ref.clone(),
-        };
-
-        dbg!(&params);
-
         let envelope = self.tx3_client.close_shipment_tx(
             CloseShipmentParams {
+                oracle: self.config.oracle_address.clone(),
                 oracle_pkh: self.config.oracle_pkh.clone(),
                 outbox: tracking.datum.outbox_address.to_string(),
                 p_status: hex::encode(status.to_string()),
@@ -226,21 +228,49 @@ impl CardanoClient {
             }
         ).await?;
 
-        dbg!(&envelope);
+        let cbor = self.sign_cbor(&envelope)?;
 
-        Ok(envelope.hash)
+        let tx_hash = self.submit_transaction(cbor).await?;
+
+        Ok(tx_hash)
+    }
+
+    fn sign_cbor(&self, envelope: &TxEnvelope) -> Result<Vec<u8>> {
+        let tx_hash_bytes = hex::decode(&envelope.hash).expect("tx_hash must be hex");
+        let private_key_bytes = hex::decode(&self.config.oracle_sk).expect("private_key must be hex");
+        let signing_key = SigningKey::from_bytes(
+            private_key_bytes
+                .as_slice()
+                .try_into()
+                .expect("private_key must be 32 bytes"),
+        );
+
+        let signature = signing_key.sign(&tx_hash_bytes);
+        let public_key = signing_key.verifying_key().to_bytes();
+
+        let witness = VKeyWitness {
+            vkey: Bytes::from(public_key.to_vec()),
+            signature: Bytes::from(signature.to_bytes().to_vec()),
+        };
+
+        let bytes = hex::decode(&envelope.tx)?;
+        let tx = MultiEraTx::decode(&bytes)?;
+        let mut tx = tx.as_conway().ok_or(anyhow!("Unsupported tx era"))?.to_owned();
+
+        let mut witness_set = tx.transaction_witness_set.unwrap();
+        witness_set.vkeywitness = NonEmptySet::from_vec(vec![witness]);
+        tx.transaction_witness_set = KeepRaw::from(witness_set);
+
+        Ok(pallas::codec::minicbor::to_vec(&tx)?)
     }
     
-    async fn submit_transaction(&self, signed_tx: String) -> Result<String> {
+    async fn submit_transaction(&self, signed_tx: Vec<u8>) -> Result<String> {
         let url = format!("{}/tx/submit", self.config.blockfrost_url);
-        
-        let tx_bytes = hex::decode(&signed_tx)
-            .context("Failed to decode signed transaction hex")?;
         
         let response = self.http_client
             .post(&url)
             .header("Content-Type", "application/cbor")
-            .body(tx_bytes)
+            .body(signed_tx)
             .send()
             .await
             .context("Failed to submit transaction to Blockfrost")?;

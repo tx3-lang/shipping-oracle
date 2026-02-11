@@ -57,6 +57,6 @@ pub fn get_status(tracking_status: &TrackingStatus) -> Option<String> {
         "DELIVERED" => Some("DELIVERED".to_string()),
         "RETURNED" => Some("NOT_DELIVERED".to_string()),
         "FAILURE" => Some("NOT_DELIVERED".to_string()),
-        _ => Some("DELIVERED".to_string()),
+        _ => None,
     }
 }

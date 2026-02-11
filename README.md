@@ -6,8 +6,8 @@ Shipping Oracle enables trustless, verifiable shipment status verification by co
 
 ## How It Works
 
-1. **Track**: A customer creates a tracking request by locking funds in a [Tracking UTxO](#track-shipment) at the validator address.
-2. **Poll**: The backend fetcher continuously polls the validator address for tracking UTxOs and queries shipment status via Shippo API.
+1. **Track**: A customer creates a tracking request by locking funds in a [Tracking UTxO](#track-shipment) at the Oracle address.
+2. **Poll**: The backend fetcher continuously polls the Oracle address for tracking UTxOs and queries shipment status via Shippo API.
 3. **Close**: When a shipment reaches final status (`DELIVERED`/`NOT_DELIVERED`), the oracle submits a [close-shipment transaction](#close-shipment), unlocking the tracking UTxO and sending the status result to the customer's outbox address.
 
 ## Project Structure
@@ -35,7 +35,7 @@ shipping-oracle/
 Scheduled Rust service that continuously monitors the Cardano blockchain for tracking UTxOs. For each tracking UTxO found, it queries the Shippo API to retrieve real-world shipment status. When a shipment reaches a final state (delivered or not delivered), the backend constructs and submits a close-shipment transaction to update the on-chain status and collect the oracle payment.
 
 **Key Responsibilities:**
-- Poll validator address for tracking UTxOs via Blockfrost
+- Poll Oracle address for tracking UTxOs via Blockfrost
 - Query Shippo API for shipment tracking status
 - Determine if shipment status is final
 - Build and submit close-shipment transactions via tx3/TRP
@@ -79,7 +79,7 @@ Address that receives the oracle's payment when a shipment is successfully close
 
 ### Track Shipment
 
-Creates a tracking request on-chain by locking funds at the validator address.
+Creates a tracking request on-chain by locking funds at the Oracle address.
 
 **Purpose**: Customer initiates shipment tracking by creating a tracking UTxO containing carrier and tracking number information.
 
@@ -89,7 +89,7 @@ Creates a tracking request on-chain by locking funds at the validator address.
 - Customer funds UTxO containing sufficient ADA (to cover tracking price deposit + fees + change)
 
 **Outputs:**
-- **Tracking UTxO** (locked at validator address)
+- **Tracking UTxO** (locked at Oracle address)
   - Value: `TRACKING_PRICE` ADA + min UTxO requirement
   - Datum: `TrackingDatum`
 - **Change UTxO** (returned to customer)
@@ -120,7 +120,7 @@ flowchart LR
 
   TX@{ label: "<br/><br/><br/><br/><br/><br/><br/><br/><br/>&nbsp;&nbsp;&nbsp;&nbsp;Track Shipment&nbsp;&nbsp;&nbsp;&nbsp;<br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>"}
 
-  O1@{ shape: brace-l, label: "Tracking UTxO<br/>━━━━━━━━━━━━━<br/>Address: Validator<br/>Value: (N + minADA) ADA<br/>Datum: TrackingDatum<br/>{ carrier, tracking_number, outbox_address}"}
+  O1@{ shape: brace-l, label: "Tracking UTxO<br/>━━━━━━━━━━━━━<br/>Address: Oracle<br/>Value: (N + minADA) ADA<br/>Datum: TrackingDatum<br/>{ carrier, tracking_number, outbox_address}"}
 
   O2@{ shape: brace-l, label: "Change UTxO<br/>━━━━━━━━━━━━━<br/>Address: Customer<br/>Value: K ADA"}
 
@@ -140,7 +140,7 @@ Oracle closes the tracking request by consuming the tracking UTxO and emitting t
 #### Data Structures
 
 **Inputs:**
-- **Tracking UTxO** (from validator)
+- **Tracking UTxO** (from Oracle)
   - Value: `TRACKING_PRICE` ADA + min UTxO
   - Datum: `TrackingDatum`
   - Redeemer: `ConsumeTracking`
@@ -183,7 +183,7 @@ config:
     curve: stepBefore
 ---
 flowchart LR
-  I1@{ shape: brace-r, label: "Tracking UTxO<br/>━━━━━━━━━━━━━━<br/>Address: Validator<br/>Value: (N + minADA) ADA<br/>Datum: TrackingDatum<br/>{ carrier, tracking_number, outbox_address}"}
+  I1@{ shape: brace-r, label: "Tracking UTxO<br/>━━━━━━━━━━━━━━<br/>Address: Oracle<br/>Value: (N + minADA) ADA<br/>Datum: TrackingDatum<br/>{ carrier, tracking_number, outbox_address}"}
 
   TX["`<br/><br/><br/><br/><br/>Close Shipment<br/>━━━━━━━━━━━━━━━━━<br/>**Validates**<br/>✓ Oracle signature present<br/>✓ Status is valid<br/>(_DELIVERED_ / _NOT_DELIVERED_)<br/>✓ Payment ≥ tracking_price<br/>✓ Shipment datum matches tracking<br/>✓ Two outputs only<br/><br/><br/><br/><br/><br/><br/>`"]
 
@@ -204,7 +204,7 @@ All on-chain data types used across the protocol.
 
 ### TrackingDatum
 
-Attached to tracking UTxOs locked at the validator address. Contains the shipment information and destination for results.
+Attached to tracking UTxOs locked at the Oracle address. Contains the shipment information and destination for results.
 
 ```aiken
 type TrackingDatum {
@@ -230,7 +230,7 @@ type ShipmentDatum {
 
 ### TrackingRedeemer
 
-Used when spending tracking UTxOs from the validator.
+Used when spending tracking UTxOs from the Oracle.
 
 ```aiken
 type TrackingRedeemer {

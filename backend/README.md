@@ -56,12 +56,12 @@ All configuration is loaded from environment variables (see `.env.example`).
 
 - `CRON_SCHEDULE`: Cron expression for the scheduler (default: `0 */5 * * * *`).
 - `SHIPPO_API_KEY`: Shippo API key for tracking lookups.
-- `VALIDATOR_ADDRESS`: Cardano validator address holding tracking UTxOs.
 - `VALIDATOR_SCRIPT_REF`: Reference script UTxO (`TxHash#TxIx`).
 - `VALIDATOR_SCRIPT_HASH`: Validator script hash (hex).
 - `ORACLE_SK`: Oracle signing key (hex).
 - `ORACLE_PKH`: Oracle public key hash (hex).
+- `ORACLE_ADDRESS`: Cardano Oracle address holding tracking UTxOs.
 - `ORACLE_PAYMENT_ADDRESS`: Address to receive Oracle transaction funds.
 - `BLOCKFROST_URL`: Blockfrost authenticated API url.
 - `TRP_URL`: TRP endpoint used by the tx3 client.
-- `TRP_API_KEY`: API key for the TRP endpoint.
+- `TRP_API_KEY`: API key for the TRP endpoint (default: empty).

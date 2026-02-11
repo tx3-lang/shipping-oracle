@@ -1,4 +1,4 @@
-use pallas_addresses::Address;
+use pallas::ledger::addresses::Address;
 use serde::Deserialize;
 
 /// Shippo API tracking response (partial, only fields we need)

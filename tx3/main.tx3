@@ -23,10 +23,6 @@ type ShipmentDatum {
     oracle_pkh: Bytes,
 }
 
-type TrackingRedeemer {
-  ConsumeTracking,
-}
-
 tx publish() {
     locals {
         quantity: 6000000,
@@ -99,7 +95,6 @@ tx close_shipment(
     input tracking {
         ref: p_utxo_ref,
         datum_is: TrackingDatum,
-        redeemer: TrackingRedeemer::ConsumeTracking {},
     }
 
     output shipment {
@@ -117,5 +112,10 @@ tx close_shipment(
     output change {
         to: Payment,
         amount: tracking - min_utxo(shipment) - fees,
+    }
+
+    collateral {
+        from: Oracle,
+        min_amount: fees,
     }
 }
