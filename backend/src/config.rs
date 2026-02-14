@@ -7,7 +7,6 @@ pub struct Config {
     pub cron_schedule: String,
     pub shippo_api_key: String,
     pub validator_script_ref: String,
-    pub validator_script_hash: String,
     pub oracle_sk: String,
     pub oracle_pkh: String,
     pub oracle_address: String,
@@ -24,7 +23,6 @@ impl Config {
     /// - `CRON_SCHEDULE`: Optional - Cron expression (default: "0 */5 * * * *")
     /// - `SHIPPO_API_KEY`: Required - Your Shippo API key
     /// - `VALIDATOR_SCRIPT_REF`: Required - Reference script UTXO (TxHash#TxIx)
-    /// - `VALIDATOR_SCRIPT_HASH`: Required - Validator script hash (hex-encoded)
     /// - `ORACLE_SK`: Required - Oracle signing key (hex-encoded)
     /// - `ORACLE_PKH`: Required - Oracle public key (hex-encoded)
     /// - `ORACLE_ADDRESS`: Required - Cardano oracle address
@@ -51,14 +49,6 @@ impl Config {
         
         if validator_script_ref.trim().is_empty() {
             bail!("VALIDATOR_SCRIPT_REF cannot be empty");
-        }
-
-        // Parse validator script hash (required)
-        let validator_script_hash = env::var("VALIDATOR_SCRIPT_HASH")
-            .context("VALIDATOR_SCRIPT_HASH not set")?;
-
-        if validator_script_hash.trim().is_empty() {
-            bail!("VALIDATOR_SCRIPT_HASH cannot be empty");
         }
 
         // Parse oracle signing key (required)
@@ -122,7 +112,6 @@ impl Config {
             cron_schedule,
             shippo_api_key,
             validator_script_ref,
-            validator_script_hash,
             oracle_sk,
             oracle_pkh,
             oracle_address,

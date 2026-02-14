@@ -20,25 +20,8 @@ use crate::models::{TrackingUTxO, TrackingDatum};
 use crate::tx3::{Client as Tx3Client, CloseShipmentParams};
 
 #[derive(Debug, Deserialize)]
-struct BlockfrostTxSearch {
+struct BlockfrostUTxO {
     tx_hash: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct BlockfrostTx {
-    inputs: Vec<BlockfrostTxInput>,
-    outputs: Vec<BlockfrostTxOutput>,
-}
-
-#[derive(Debug, Deserialize)]
-struct BlockfrostTxInput {
-    address: String,
-    reference_script_hash: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct BlockfrostTxOutput {
-    address: String,
     output_index: u32,
     inline_datum: Option<String>,
 }
@@ -117,75 +100,17 @@ impl CardanoClient {
         })
     }
 
-    async fn map_tx_to_tracking_utxo(&self, tx_hash: String) -> Option<TrackingUTxO> {
-        let url = format!(
-            "{}/txs/{}/utxos",
-            self.config.blockfrost_url,
-            tx_hash,
-        );
-
-        let response = self.http_client
-            .get(&url)
-            .send()
-            .await;
-        
-        if response.is_err() || !response.as_ref().unwrap().status().is_success() {
-            return None;
-        }
-
-        let tx: Result<BlockfrostTx, reqwest::Error> = response.unwrap().json().await;
-
-        if tx.is_err() {
-            return None;
-        }
-
-        let tx = tx.unwrap();
-
-        if !tx.inputs.iter().any(|input| {
-            input.address == self.config.oracle_address &&
-            input.reference_script_hash.as_deref() == Some(&self.config.validator_script_hash)
-        }) {
-            return None;
-        }
-
-        let utxo = tx.outputs.iter().find(|output| {
-            output.address == self.config.oracle_address &&
-            output.inline_datum.is_some()
-        });
-
-        if utxo.is_none() {
-            return None;
-        }
-
-        let utxo = utxo.unwrap();
-
-        let datum = TrackingDatum::from_cbor(
-            utxo.inline_datum.as_ref().unwrap()
-        );
-
-        if datum.is_none() {
-            return None;
-        }
-
-        Some(TrackingUTxO {
-            tx_hash: tx_hash.to_string(),
-            tx_index: utxo.output_index,
-            datum: datum.unwrap(),
-        })
-    }
-
     pub async fn fetch_shipments(&self) -> Result<Vec<TrackingUTxO>> {
         let url = format!(
-            "{}/addresses/{}/transactions",
+            "{}/addresses/{}/utxos",
             self.config.blockfrost_url,
-            self.config.oracle_address
+            self.config.oracle_address,
         );
-        
+
         let response = self.http_client
             .get(&url)
             .send()
-            .await
-            .context("Failed to query oracle transactions from Blockfrost")?;
+            .await?;
         
         if !response.status().is_success() {
             let status = response.status();
@@ -196,18 +121,25 @@ impl CardanoClient {
                 body
             ));
         }
-        
-        let txs: Vec<BlockfrostTxSearch> = response.json().await
-            .context("Failed to parse Blockfrost transactions response")?;
 
-        let shipments = futures::future::join_all(
-            txs.into_iter()
-            .map(|tx_search| {
-                self.map_tx_to_tracking_utxo(tx_search.tx_hash.clone())
-            })
-        );
-        
-        Ok(shipments.await.into_iter().filter_map(|s| s).collect())
+        let utxos: Vec<BlockfrostUTxO> = response.json().await
+            .context("Failed to parse Blockfrost UTxOs response")?;
+
+        let mut tracking_utxos = Vec::new();
+        for utxo in utxos {
+            if let Some(inline_datum) = utxo.inline_datum {
+                let tracking_datum = TrackingDatum::from_cbor(&inline_datum);
+                if let Some(tracking_datum) = tracking_datum {
+                    tracking_utxos.push(TrackingUTxO {
+                        tx_hash: utxo.tx_hash.clone(),
+                        tx_index: utxo.output_index,
+                        datum: tracking_datum,
+                    });
+                }
+            }
+        }
+
+        Ok(tracking_utxos)
     }
 
     pub async fn submit_shipment(
