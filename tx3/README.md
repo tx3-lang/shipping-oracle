@@ -18,3 +18,7 @@ Env values are required by the tx3 environment and are provided via `.env.previe
 - `VALIDATOR_SCRIPT_BYTES`: Compiled validator script bytes.
 - `VALIDATOR_SCRIPT_REF`: Reference script UTxO (`TxHash#TxIx`).
 - `ORACLE_PKH`: Oracle public key hash.
+
+## License
+
+Licensed under the Apache License, Version 2.0. See `LICENSE`.

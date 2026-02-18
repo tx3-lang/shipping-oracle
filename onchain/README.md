@@ -13,3 +13,7 @@ The on-chain component is an Aiken validator that governs shipment tracking UTxO
 ## Parameters
 - `tracking_price`: The amount of lovelaces required to create a Tracking UTxO.
 - `payment_address`: The address that will receive the funds once the shipment is closed.
+
+## License
+
+Licensed under the Apache License, Version 2.0. See `LICENSE`.

@@ -246,3 +246,7 @@ Valid shipment status values enforced by the validator.
 pub const status_delivered: ByteArray = "DELIVERED"
 pub const status_not_delivered: ByteArray = "NOT_DELIVERED"
 ```
+
+## License
+
+Licensed under the Apache License, Version 2.0. See `LICENSE`.

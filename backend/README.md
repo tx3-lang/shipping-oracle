@@ -64,3 +64,7 @@ All configuration is loaded from environment variables (see `.env.example`).
 - `BLOCKFROST_URL`: Blockfrost authenticated API url.
 - `TRP_URL`: TRP endpoint used by the tx3 client.
 - `TRP_API_KEY`: API key for the TRP endpoint (default: empty).
+
+## License
+
+Licensed under the Apache License, Version 2.0. See `LICENSE`.
