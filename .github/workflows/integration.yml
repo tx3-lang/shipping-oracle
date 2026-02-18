@@ -1,0 +1,76 @@
+name: Integration Tests
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/integration.yml'
+
+jobs:
+  integration:
+    name: Integration
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: backend/target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run integration tests
+        env:
+          SHIPPO_API_KEY: ${{ secrets.SHIPPO_API_KEY }}
+          BLOCKFROST_URL: ${{ secrets.BLOCKFROST_URL }}
+          TRP_URL: ${{ secrets.TRP_URL }}
+          TRP_API_KEY: ${{ secrets.TRP_API_KEY }}
+          CRON_SCHEDULE: "0 */10 * * * *"
+          VALIDATOR_SCRIPT_REF: "a6a57fe7cfcd69537dc88bfe4321cd7f164f26afd21c91c78cced224e6496f41#1"
+          ORACLE_SK: ${{ secrets.ORACLE_SK }}
+          ORACLE_PKH: "021a8c1045ae4e8a999496e176792ba7642123994215a36b703c903a"
+          ORACLE_ADDRESS: "addr_test1vqpp4rqsgkhyaz5ejjtwzane9wnkggfrn9pptgmtwq7fqws6t8yck"
+          ORACLE_PAYMENT_ADDRESS: "addr_test1vqpp4rqsgkhyaz5ejjtwzane9wnkggfrn9pptgmtwq7fqws6t8yck"
+        run: cargo test --test integration -- --nocapture
+
+      - name: Upload integration JSON report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-report-json
+          path: backend/reports/integration.json
+
+      - name: Upload integration Markdown report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-report-md
+          path: backend/reports/integration.md
+
+      - name: Append report to job summary
+        if: always()
+        run: cat reports/integration.md >> "$GITHUB_STEP_SUMMARY"

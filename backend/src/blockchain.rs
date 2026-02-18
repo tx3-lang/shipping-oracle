@@ -1,4 +1,4 @@
-use anyhow::{Context, Ok, Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use ed25519_dalek::{Signer, SigningKey};
 use pallas::codec::{
     minicbor,
@@ -11,12 +11,12 @@ use pallas::ledger::{
 };
 use reqwest::Client as HttpClient;
 use serde::Deserialize;
-use serde_json::Value;
 use std::collections::HashMap;
 use tx3_sdk::trp::{ClientOptions, TxEnvelope};
 
 use crate::config::Config;
 use crate::models::{TrackingUTxO, TrackingDatum};
+use crate::submitter::{BlockfrostSubmitter, TxSubmitter};
 use crate::tx3::{Client as Tx3Client, CloseShipmentParams};
 
 #[derive(Debug, Deserialize)]
@@ -75,6 +75,7 @@ pub struct CardanoClient {
     config: Config,
     http_client: HttpClient,
     tx3_client: Tx3Client,
+    submitter: Box<dyn TxSubmitter>,
 }
 
 impl CardanoClient {
@@ -92,11 +93,40 @@ impl CardanoClient {
                 headers,
             }
         );
-        
+
+        let submitter = Box::new(BlockfrostSubmitter::new(
+            config.blockfrost_url.clone(),
+            http_client.clone(),
+        ));
+
         Ok(Self {
             config,
             http_client,
             tx3_client,
+            submitter,
+        })
+    }
+
+    pub fn with_submitter(config: Config, submitter: Box<dyn TxSubmitter>) -> Result<Self> {
+        let http_client = HttpClient::new();
+
+        let mut headers = None;
+        if let Some(trp_api_key) = &config.trp_api_key {
+            headers = Some(HashMap::from([("dmtr-api-key".to_string(), trp_api_key.clone())]));
+        }
+
+        let tx3_client = Tx3Client::new(
+            ClientOptions {
+                endpoint: config.trp_url.clone(),
+                headers,
+            }
+        );
+
+        Ok(Self {
+            config,
+            http_client,
+            tx3_client,
+            submitter,
         })
     }
 
@@ -147,22 +177,51 @@ impl CardanoClient {
         tracking: &TrackingUTxO,
         status: &str,
     ) -> Result<String> {
-        let envelope = self.tx3_client.close_shipment_tx(
-            CloseShipmentParams {
-                oracle: self.config.oracle_address.clone(),
-                oracle_pkh: self.config.oracle_pkh.clone(),
-                outbox: tracking.datum.outbox_address.to_string(),
-                p_status: hex::encode(status.to_string()),
-                p_timestamp: format!("{}", chrono::Utc::now().timestamp() as u64),
-                p_utxo_ref: format!("{}#{}", tracking.tx_hash, tracking.tx_index),
-                payment: self.config.oracle_payment_address.clone(),
-                validator_script_ref: self.config.validator_script_ref.clone(),
-            }
-        ).await?;
+        self.submit_shipment_at(tracking, status, chrono::Utc::now().timestamp() as u64).await
+    }
+
+    pub async fn prepare_close_shipment(
+        &self,
+        tracking: &TrackingUTxO,
+        status: &str,
+    ) -> Result<(CloseShipmentParams, TxEnvelope)> {
+        self.prepare_close_shipment_at(tracking, status, chrono::Utc::now().timestamp() as u64).await
+    }
+
+    pub async fn prepare_close_shipment_at(
+        &self,
+        tracking: &TrackingUTxO,
+        status: &str,
+        timestamp: u64,
+    ) -> Result<(CloseShipmentParams, TxEnvelope)> {
+        let params = CloseShipmentParams {
+            oracle: self.config.oracle_address.clone(),
+            oracle_pkh: self.config.oracle_pkh.clone(),
+            outbox: tracking.datum.outbox_address.to_string(),
+            p_status: hex::encode(status.to_string()),
+            p_timestamp: format!("{}", timestamp),
+            p_utxo_ref: format!("{}#{}", tracking.tx_hash, tracking.tx_index),
+            payment: self.config.oracle_payment_address.clone(),
+            validator_script_ref: self.config.validator_script_ref.clone(),
+        };
+
+        let envelope = self.tx3_client.close_shipment_tx(params.clone()).await?;
+
+        Ok((params, envelope))
+    }
+
+    pub async fn submit_shipment_at(
+        &self,
+        tracking: &TrackingUTxO,
+        status: &str,
+        timestamp: u64,
+    ) -> Result<String> {
+        let (_params, envelope) = self
+            .prepare_close_shipment_at(tracking, status, timestamp)
+            .await?;
 
         let cbor = self.sign_cbor(&envelope)?;
-
-        let tx_hash = self.submit_transaction(cbor).await?;
+        let tx_hash = self.submitter.submit(cbor).await?;
 
         Ok(tx_hash)
     }
@@ -196,35 +255,8 @@ impl CardanoClient {
         Ok(pallas::codec::minicbor::to_vec(&tx)?)
     }
     
-    async fn submit_transaction(&self, signed_tx: Vec<u8>) -> Result<String> {
-        let url = format!("{}/tx/submit", self.config.blockfrost_url);
-        
-        let response = self.http_client
-            .post(&url)
-            .header("Content-Type", "application/cbor")
-            .body(signed_tx)
-            .send()
-            .await
-            .context("Failed to submit transaction to Blockfrost")?;
-        
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            return Err(anyhow!(
-                "Blockfrost transaction submission failed (status {}): {}",
-                status,
-                body
-            ));
-        }
-        
-        let response_json: Value = response.json().await
-            .context("Failed to parse Blockfrost submission response")?;
-        
-        let tx_hash = response_json
-            .as_str()
-            .ok_or_else(|| anyhow!("Expected tx hash string in response"))?
-            .to_string();
-        
-        Ok(tx_hash)
+    #[cfg(test)]
+    pub fn submitter(&self) -> &dyn TxSubmitter {
+        self.submitter.as_ref()
     }
 }
