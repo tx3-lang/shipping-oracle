@@ -3,7 +3,9 @@ use aiken/collection/list
 use aiken/crypto
 use cardano/address.{Credential, VerificationKey}
 use cardano/assets
-use cardano/transaction.{InlineDatum, NoDatum, Output, OutputReference, Input, Transaction}
+use cardano/transaction.{
+  InlineDatum, Input, NoDatum, Output, OutputReference, Transaction,
+}
 use config
 use types.{GovernanceDatum, OracleData, OracleRedeemer}
 
@@ -54,9 +56,7 @@ const test_oracle_sig: ByteArray =
   #"4b2d1bcbbb6ab6d3f73271c50642306702899b7c979d48f86106092860e4d978e0e12924b7520049fabfce8838342faf6a5361e20b45be7ee9da31706967f104"
 
 const test_withdrawal_credential: Credential =
-  VerificationKey(
-    #"cafecafecafecafecafecafecafecafecafecafecafecafecafecafe",
-  )
+  VerificationKey(#"cafecafecafecafecafecafecafecafecafecafecafecafecafecafe")
 
 fn zero_edge_data() -> OracleData {
   OracleData {
@@ -146,6 +146,9 @@ test withdraw_missing_governance_nft() fail {
   let redeemer =
     OracleRedeemer { data: zero_edge_data(), signature: test_oracle_sig }
   let tx =
-    Transaction { ..transaction.placeholder, reference_inputs: [non_gov_input()] }
+    Transaction {
+      ..transaction.placeholder,
+      reference_inputs: [non_gov_input()],
+    }
   oracle.withdraw(redeemer, test_withdrawal_credential, tx)
 }
