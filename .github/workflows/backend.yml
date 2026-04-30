@@ -51,6 +51,10 @@ jobs:
       - name: Run cargo check
         run: cargo check --all-features
 
+      - name: Run cargo clippy (all targets)
+        run: cargo clippy --all-targets -- -D warnings
+        continue-on-error: true
+
   build:
     name: Build
     runs-on: ubuntu-latest

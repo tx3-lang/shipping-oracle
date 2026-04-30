@@ -1,16 +1,21 @@
 name: Integration Tests
 
 on:
-  workflow_dispatch:
   pull_request:
     branches: [ main, develop ]
     paths:
       - 'backend/**'
       - '.github/workflows/integration.yml'
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/integration.yml'
+  workflow_dispatch:
 
 jobs:
   integration:
-    name: Integration
+    name: HTTP integration tests + report
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -44,19 +49,11 @@ jobs:
           path: backend/target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Run integration tests
-        env:
-          SHIPPO_API_KEY: ${{ secrets.SHIPPO_API_KEY }}
-          BLOCKFROST_URL: ${{ secrets.BLOCKFROST_URL }}
-          TRP_URL: ${{ secrets.TRP_URL }}
-          TRP_API_KEY: ${{ secrets.TRP_API_KEY }}
-          CRON_SCHEDULE: "0 */10 * * * *"
-          VALIDATOR_SCRIPT_REF: "a6a57fe7cfcd69537dc88bfe4321cd7f164f26afd21c91c78cced224e6496f41#1"
-          ORACLE_SK: ${{ secrets.ORACLE_SK }}
-          ORACLE_PKH: "021a8c1045ae4e8a999496e176792ba7642123994215a36b703c903a"
-          ORACLE_ADDRESS: "addr_test1vqpp4rqsgkhyaz5ejjtwzane9wnkggfrn9pptgmtwq7fqws6t8yck"
-          ORACLE_PAYMENT_ADDRESS: "addr_test1vqpp4rqsgkhyaz5ejjtwzane9wnkggfrn9pptgmtwq7fqws6t8yck"
-        run: cargo test --test integration -- --nocapture
+      # Pull-based tests stub Shippo with wiremock — no secrets / network needed.
+      # `--all-targets` runs lib + integration + cbor_alignment + signature_vectors
+      # + integration_report (which writes backend/reports/integration.{json,md}).
+      - name: Run backend tests
+        run: cargo test --all-targets -- --nocapture
 
       - name: Upload integration JSON report
         if: always()
@@ -64,6 +61,8 @@ jobs:
         with:
           name: integration-report-json
           path: backend/reports/integration.json
+          retention-days: 90
+          if-no-files-found: warn
 
       - name: Upload integration Markdown report
         if: always()
@@ -71,7 +70,14 @@ jobs:
         with:
           name: integration-report-md
           path: backend/reports/integration.md
+          retention-days: 90
+          if-no-files-found: warn
 
       - name: Append report to job summary
         if: always()
-        run: cat reports/integration.md >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          if [ -f backend/reports/integration.md ]; then
+            cat backend/reports/integration.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No integration.md report was produced." >> "$GITHUB_STEP_SUMMARY"
+          fi

@@ -16,5 +16,12 @@ version = "v3"
 source = "github"
 
 [config.default]
-tracking_price = 10000000
-payment_address = "addr1..."
+# One-shot mint seed: the governance_nft policy requires consuming this UTxO.
+# Replace with a real UTxO controlled by the oracle wallet before deploy.
+seed_utxo_tx_hash = { bytes = "225d6c344ba5d2bccf57b1434e59bb5843dddbfd0d68285f1c805640eb7aec04", encoding = "base16" }
+seed_utxo_index = 2
+# Asset name of the governance NFT (hex). "474f56" = ASCII "GOV".
+governance_asset_name = { bytes = "474f56", encoding = "base16" }
+# Policy id of governance_nft (28-byte script hash). Set on the second pass of
+# `aiken build` from the compiled mint policy hash in plutus.json.
+gov_policy_id = { bytes = "33f2b45c5911c2a66d93d8f60d07e34edee203d982d75637b09649ab", encoding = "base16" }

@@ -1,7 +1,7 @@
 [protocol]
 name = "shipping-oracle"
 scope = "tx3-lang"
-version = "0.0.0"
+version = "0.1.0"
 description = ""
 main = "main.tx3"
 

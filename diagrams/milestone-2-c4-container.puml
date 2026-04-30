@@ -1,0 +1,25 @@
+@startuml milestone-2-c4-container
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Shipping Oracle — Container Diagram (Milestone 2)
+
+Person(consumer, "Consumer", "DApp or user that wants attested shipment data on-chain")
+
+System_Boundary(oracle, "Shipping Oracle") {
+    Container(api, "Oracle API Backend", "Rust / Axum", "Fetches shipment status from Shippo on demand and returns data + Ed25519 signature")
+    Container(contracts, "Oracle Smart Contracts", "Aiken / Plutus V3", "Withdrawal validator (verifies sig) + one-shot NFT minting policy")
+    ContainerDb(governance, "Governance UTxO", "Cardano UTxO", "Static UTxO carrying the governance NFT + GovernanceDatum { oracle_vk }")
+}
+
+System_Ext(shippo, "Shippo API", "External logistics tracking API")
+System_Ext(cardano, "Cardano Network", "L1 blockchain (devnet Dolos, preview, or mainnet)")
+
+Rel(consumer, api, "GET /v1/shipment", "HTTPS / JSON")
+Rel(api, shippo, "Fetch tracking status", "HTTPS")
+Rel(consumer, cardano, "Submit tx with withdrawal + OracleRedeemer", "Cardano tx")
+Rel(cardano, contracts, "Executes withdrawal validator")
+Rel(contracts, governance, "Reads via reference_inputs (by NFT)")
+
+@enduml
