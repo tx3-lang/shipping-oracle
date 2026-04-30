@@ -76,8 +76,8 @@ jobs:
       - name: Append report to job summary
         if: always()
         run: |
-          if [ -f backend/reports/integration.md ]; then
-            cat backend/reports/integration.md >> "$GITHUB_STEP_SUMMARY"
+          if [ -f reports/integration.md ]; then
+            cat reports/integration.md >> "$GITHUB_STEP_SUMMARY"
           else
             echo "No integration.md report was produced." >> "$GITHUB_STEP_SUMMARY"
           fi

@@ -1,54 +1,56 @@
 # Testing — Shipping Oracle
 
-Runbook para reproducir todas las pruebas del proyecto, de unit tests a E2E
-on-chain. Pensado para correrlo de arriba abajo desde una checkout limpia.
+Runbook for reproducing every test in the project, from unit tests up to a full local end-to-end on-chain flow. Designed to be followed top-to-bottom from a clean checkout.
 
-## Matriz
+## Matrix
 
-| Nivel | Qué prueba | Comando | Red / cuenta | Tiempo |
+| Level | What it tests | Command | Network / account | Time |
 |---|---|---|---|---|
-| 1 | Unit + integration Rust | `cargo test` | ninguna (Shippo stubbed con wiremock) | ~30 s |
-| 2 | Smoke de la API en vivo | `cargo run` + `scripts/smoke.sh` | Shippo real | ~5 s |
-| 3 | Unit Aiken (validator + mint) | `aiken check` | ninguna | ~2 s |
-| 4 | Build on-chain (two-pass) | `aiken build` x2 | ninguna | ~5 s |
-| 5 | E2E local con devnet | `trix devnet` + tx3 | Dolos local (sin testnet) | ~1 min |
+| 1 | Unit + integration (Rust) | `cargo test` | none (Shippo stubbed via wiremock) | ~30 s |
+| 2 | Live API smoke | `cargo run` + `scripts/smoke.sh` | real Shippo | ~5 s |
+| 3 | On-chain unit tests (Aiken) | `aiken check` | none | ~2 s |
+| 4 | On-chain build (two-pass) | `aiken build` ×2 | none | ~5 s |
+| 5 | End-to-end on local devnet | `trix devnet` + tx3 | local Dolos (no testnet needed) | ~1 min |
 
 ---
 
-## 1. Tests del backend (sin red)
+## 1. Backend tests (no network)
 
 ```bash
 cd backend
-cargo test                             # todo
-cargo test --test cbor_alignment       # alineación CBOR vs Aiken
-cargo test --test signature_vectors    # vectores Ed25519 deterministas
-cargo test --test integration          # HTTP end-to-end con wiremock
+cargo test                             # everything
+cargo test --test cbor_alignment       # CBOR alignment vs Aiken
+cargo test --test signature_vectors    # deterministic Ed25519 vectors
+cargo test --test integration          # HTTP end-to-end with wiremock
+cargo test --test integration_report   # generates backend/reports/integration.{json,md}
 ```
 
-No requiere `.env` — Shippo está stubbed.
+No `.env` required — Shippo is stubbed.
+
+The `integration_report` test exercises every status path (DELIVERED, IN_TRANSIT, PRE_TRANSIT, NOT_DELIVERED via FAILURE/RETURNED, UNKNOWN, plus the upstream-error path) and writes a JSON + markdown report to `backend/reports/`. CI uploads both as artifacts (see `.github/workflows/integration.yml`) — they're the milestone evidence E2.
 
 ---
 
-## 2. Smoke de la API en vivo
+## 2. Live API smoke
 
-### 2.1 Configurar el `.env`
+### 2.1 Configure `.env`
 
 ```bash
 cd backend
 cp .env.example .env
 ```
 
-Completar las 5 variables obligatorias:
+Fill in the five required variables:
 
-| Variable | De dónde sale |
+| Variable | Where it comes from |
 |---|---|
-| `SHIPPO_API_KEY` | dashboard de Shippo |
-| `ORACLE_SK` | hex de 32 bytes, ej. derivado de `local_wallets/oracle_wallet.skey` |
-| `ORACLE_PKH` | blake2b-224 de la vkey (28 bytes hex) |
-| `ORACLE_ADDRESS` | contenido de `local_wallets/oracle_wallet.addr` |
-| `TRP_URL` | endpoint TRP, ej. `http://localhost:8164` |
+| `SHIPPO_API_KEY` | Shippo dashboard |
+| `ORACLE_SK` | 32-byte hex (`openssl rand -hex 32`, or the signing key of an existing wallet) |
+| `ORACLE_PKH` | blake2b-224 of the vkey (28 bytes hex) |
+| `ORACLE_ADDRESS` | `addr_test1…` you control (or any placeholder for smoke testing) |
+| `TRP_URL` | TRP endpoint, e.g. `http://localhost:8164` for the trix devnet |
 
-### 2.2 Levantar el server
+### 2.2 Start the server
 
 ```bash
 cd backend
@@ -56,194 +58,172 @@ cargo run
 # → "oracle listening addr=0.0.0.0:3000"
 ```
 
-### 2.3 Correr el smoke
+### 2.3 Run the smoke script
 
-En otra terminal:
+In another terminal:
 
 ```bash
 ./scripts/smoke.sh
-# Overrides opcionales:
+# Optional overrides:
 #   BASE_URL=http://host:port ./scripts/smoke.sh
-#   CARRIER=ups ./scripts/smoke.sh   (tracking numbers reales, no demo)
+#   CARRIER=ups ./scripts/smoke.sh   (real tracking numbers, not the demo ones)
 ```
 
-El script pega a `/health` y a `/v1/shipment` con tres tracking numbers de
-demo de Shippo: `SHIPPO_PRE_TRANSIT`, `SHIPPO_TRANSIT`, `SHIPPO_DELIVERED`.
+The script hits `/health` and `/v1/shipment` with three Shippo demo tracking numbers: `SHIPPO_PRE_TRANSIT`, `SHIPPO_TRANSIT`, `SHIPPO_DELIVERED`.
 
-Requiere `jq`.
+Requires `jq`.
 
 ---
 
-## 3. Tests unitarios on-chain
+## 3. On-chain unit tests
 
 ```bash
 cd onchain
-aiken check                   # todos
-aiken check -m oracle         # solo el withdrawal validator
-aiken check -m governance_nft # solo la mint policy
+aiken check                   # all
+aiken check -m oracle         # withdrawal validator only
+aiken check -m governance_nft # mint policy only
 ```
 
-Cubre:
+Coverage:
 
-- `oracle.ak`: `withdraw_valid_signature`, `withdraw_invalid_signature`,
-  `withdraw_tampered_data`, `withdraw_missing_governance_nft`.
-- `governance_nft.ak`: `mint_valid`, `mint_missing_seed_input`,
-  `mint_wrong_asset_name`, `mint_wrong_quantity`, `mint_extra_asset`.
-- `cbor_alignment_tests.ak`: bytes pinneados contra `backend/tests/cbor_alignment.rs`.
+- `oracle.ak`: `withdraw_valid_signature`, `withdraw_invalid_signature`, `withdraw_tampered_data`, `withdraw_missing_governance_nft`.
+- `governance_nft.ak`: `mint_valid`, `mint_missing_seed_input`, `mint_wrong_asset_name`, `mint_wrong_quantity`, `mint_extra_asset`.
+- `cbor_alignment_tests.ak`: byte vectors pinned against `backend/tests/cbor_alignment.rs`.
 
-Si rompo un vector en Rust, hay que actualizar el lado Aiken al mismo tiempo
-— los hex están hardcodeados en ambos.
+If you change a vector on the Rust side, the Aiken side must be updated at the same time — the hex strings are hardcoded in both files.
 
 ---
 
-## 4. Build on-chain (two-pass)
+## 4. On-chain build (two-pass)
 
-Hay un orden obligatorio: `oracle.ak` referencia `config.gov_policy_id`, y
-ese hash depende del bytecode compilado de `governance_nft.ak`. Por eso
-hace falta compilar dos veces.
+There's a mandatory order: `oracle.ak` references `config.gov_policy_id`, and that hash depends on the compiled bytecode of `governance_nft.ak`. So you compile twice.
 
 ```bash
 cd onchain
 
-# Pass 1: compila con el placeholder actual
+# Pass 1: compile against whatever placeholder is in aiken.toml
 aiken build
 
-# Capturar el policy id real
+# Capture the real policy id
 GOV_POLICY_ID=$(jq -r '.validators[] | select(.title|contains("governance_nft.mint")) | .hash' plutus.json)
 echo "$GOV_POLICY_ID"
 
-# Reemplazar gov_policy_id en aiken.toml [config.default]
-# Mantener encoding = "base16"
-# Editar manualmente o:
+# Replace gov_policy_id in aiken.toml [config.default]
+# Keep encoding = "base16"
+# Edit manually or:
 #   sed -i.bak "s/^gov_policy_id = .*/gov_policy_id = { bytes = \"$GOV_POLICY_ID\", encoding = \"base16\" }/" aiken.toml
 
-# Pass 2: re-compila con el policy id real
+# Pass 2: recompile against the real policy id
 aiken build
 ```
 
-Recordatorios:
+Reminders:
 
-- En `aiken.toml`, los bytes deben ser `{ bytes = "...", encoding = "base16" }`.
-  Si omito `encoding`, `aiken check` falla con "missing field encoding".
-- Cada vez que cambio `seed_utxo_*`, el `gov_policy_id` cambia → repetir el
-  two-pass.
+- In `aiken.toml`, byte values must be `{ bytes = "...", encoding = "base16" }`. Omitting `encoding` makes `aiken check` fail with `missing field encoding`.
+- Every time you change `seed_utxo_*`, the `gov_policy_id` changes → repeat the two-pass.
 
 ---
 
-## 5. E2E local con trix devnet (Dolos)
+## 5. End-to-end on the local devnet (Dolos)
 
-> Los flags exactos de `trix` varían entre versiones. Si un comando no
-> matchea, correr `trix --help` o `trix <subcommand> --help`.
+> Exact `trix` flags vary between versions. If a command doesn't match, run `trix --help` or `trix <subcommand> --help`.
 
-### 5.1 Levantar el devnet
+### 5.1 Start the devnet
 
 ```bash
 cd tx3
 trix devnet start
-trix devnet info     # muestra wallets pre-fondeadas (alice/bob/charlie)
+trix devnet info     # shows pre-funded wallets (alice/bob/charlie)
 ```
 
-`devnet.toml` define UTxOs pre-fondeadas para `@alice`, `@bob`, `@charlie`
-(100k ADA cada una).
+`devnet.toml` defines pre-funded UTxOs for `@alice`, `@bob`, `@charlie` (100k ADA each).
 
-### 5.2 Cargar la wallet del oracle
+### 5.2 Provision the oracle wallet
+
+Use one of the pre-funded devnet wallets, or create a fresh one:
 
 ```bash
-trix wallet import oracle --skey local_wallets/oracle_wallet.skey
+cshell wallet create oracle
 ```
 
-`backend/.env` (`ORACLE_SK`) debe apuntar a la misma sk.
+Export its signing-key hex into `backend/.env::ORACLE_SK` so the API signs with the same key the on-chain governance UTxO will trust. The wallet's verification key (hex, 32 bytes) goes into `tx3/.env.local::ORACLE_VK`.
 
-### 5.3 Configurar `seed_utxo_ref` y rebuildear
+### 5.3 Wire `seed_utxo_ref` and rebuild
 
 ```bash
-trix utxos --wallet oracle    # elegir uno; copiar tx_hash e index
-# Editar onchain/aiken.toml:
+trix utxos --wallet oracle    # pick one; copy tx_hash and index
+# Edit onchain/aiken.toml:
 #   seed_utxo_tx_hash = { bytes = "<tx_hash>", encoding = "base16" }
 #   seed_utxo_index   = <index>
-cd onchain && aiken build     # pass 1 → nuevo gov_policy_id
-# Actualizar gov_policy_id en aiken.toml (ver sección 4)
+cd onchain && aiken build     # pass 1 → new gov_policy_id
+# Update gov_policy_id in aiken.toml (see section 4)
 aiken build                   # pass 2
 ```
 
-### 5.4 Publicar scripts
+### 5.4 Publish the scripts
 
 ```bash
 cd tx3
-trix tx run publish_scripts --profile devnet
+trix invoke -p local           # choose: publish_scripts
 ```
 
-Publica `governance_nft` y `oracle` como reference scripts. Anotar las refs
-(`txhash#ix`) que devuelve.
+Publishes `governance_nft` and `oracle` as reference scripts. Note the refs (`txhash#ix`) it returns and set them in `tx3/.env.local::ORACLE_SCRIPT_REF`.
 
-### 5.5 Bootstrap governance (mint del NFT)
+### 5.5 Bootstrap governance (mint the NFT)
 
 ```bash
-trix tx run bootstrap_governance --profile devnet
+trix invoke -p local           # choose: bootstrap_governance
 ```
 
-Consume `seed_utxo_ref`, mintea el NFT y lo bloquea en una UTxO con
-`GovernanceDatum { oracle_vk }`. Anotar `governance_utxo_ref`.
+Consumes `seed_utxo_ref`, mints the NFT, and locks it in a UTxO with `GovernanceDatum { oracle_vk }`. Note the resulting `governance_utxo_ref` and set it in `tx3/.env.local::GOVERNANCE_UTXO_REF`.
 
-### 5.6 Levantar el backend contra el devnet
+### 5.6 Run the backend against the devnet
 
-En `backend/.env`:
+In `backend/.env`:
 
 ```
-TRP_URL=http://localhost:8164    # endpoint TRP del devnet
-ORACLE_SK=<misma sk que la wallet del oracle>
+TRP_URL=http://localhost:8164    # devnet TRP endpoint
+ORACLE_SK=<same sk as the oracle wallet>
 ```
 
 ```bash
 cd backend && cargo run
-./scripts/smoke.sh    # confirmar que la API responde
+./scripts/smoke.sh    # confirm the API responds
 ```
 
 ### 5.7 Consumer tx (consume_oracle_data)
 
 ```bash
 RESPONSE=$(curl -fsS "http://localhost:3000/v1/shipment?carrier=shippo&tracking_number=SHIPPO_DELIVERED")
-CARRIER_HASH=$(jq -r '.data.carrier_hash' <<<"$RESPONSE")
-TN_HASH=$(jq -r '.data.tracking_number_hash' <<<"$RESPONSE")
-STATUS_HEX=$(printf '%s' "$(jq -r '.data.status' <<<"$RESPONSE")" | xxd -p)
-TIMESTAMP=$(jq -r '.data.timestamp' <<<"$RESPONSE")
-SIG=$(jq -r '.signature' <<<"$RESPONSE")
+
+cat > /tmp/consume_args.json <<EOF
+{
+  "p_carrier_hash":         "$(jq -r '.data.carrier_hash'         <<<"$RESPONSE")",
+  "p_tracking_number_hash": "$(jq -r '.data.tracking_number_hash' <<<"$RESPONSE")",
+  "p_status":               "$(jq -r '.data.status' <<<"$RESPONSE" | xxd -p | tr -d '\n')",
+  "p_timestamp":            $(jq -r '.data.timestamp' <<<"$RESPONSE"),
+  "p_signature":            "$(jq -r '.signature' <<<"$RESPONSE")"
+}
+EOF
 
 cd tx3
-trix tx run consume_oracle_data \
-  --profile devnet \
-  --arg p_carrier_hash="$CARRIER_HASH" \
-  --arg p_tracking_number_hash="$TN_HASH" \
-  --arg p_status="$STATUS_HEX" \
-  --arg p_timestamp="$TIMESTAMP" \
-  --arg p_signature="$SIG"
+trix invoke -p local --args-json-path /tmp/consume_args.json    # choose: consume_oracle_data
 ```
 
-### 5.8 Verificar on-chain
+### 5.8 Verify on-chain
 
 ```bash
-trix utxos --wallet consumer    # debería aparecer la UTxO `attested` con OracleData inline
-trix tx <txhash>                # detalles de la tx
+trix utxos --wallet consumer    # the `attested` UTxO with OracleData inline should appear
+trix tx <txhash>                # tx details
 ```
 
-Si la firma no valida, el script falla y la tx es rechazada por el nodo —
-ese es el smoke test on-chain.
+If the signature doesn't validate, the script fails and the tx is rejected by the node — that's the on-chain smoke test.
 
 ---
 
 ## Gotchas
 
-1. **Olvidar el segundo `aiken build`** después de cambiar `gov_policy_id` o
-   `seed_utxo_*` en `aiken.toml` → on-chain compila con placeholder, falla
-   en runtime.
-2. **`oracle_vk` desincronizado** entre `backend/.env` (`ORACLE_SK`) y el
-   `GovernanceDatum` mintado en 5.5 → la firma valida cripto-correctamente
-   pero el validator la rechaza porque la vk del datum no es la que firmó.
-   Re-mintear governance o re-configurar `ORACLE_SK`.
-3. **`status` como string vs bytes**: el campo es `Bytes` on-chain. La API
-   devuelve string (`"DELIVERED"`), pero al consumer hay que pasarle el hex
-   de los bytes UTF-8. Por eso `xxd -p` en 5.7.
-4. **Vectores de firma desincronizados**: si toco `signature_vectors.rs`
-   tengo que re-pegar `test_oracle_vk` y `test_oracle_sig` en
-   `onchain/validators/oracle.ak` (líneas 50-54). Pasa lo mismo con
-   `cbor_alignment_tests.ak` cuando cambian los hex de `OracleData`.
+1. **Skipping the second `aiken build`** after changing `gov_policy_id` or `seed_utxo_*` in `aiken.toml` → on-chain compiles with the placeholder and fails at runtime.
+2. **`oracle_vk` out of sync** between `backend/.env` (`ORACLE_SK`) and the `GovernanceDatum` minted in 5.5 → the signature verifies cryptographically but the validator rejects it because the vk in the datum isn't the one that signed. Re-mint governance, or reconfigure `ORACLE_SK`.
+3. **`status` as string vs bytes**: the field is `Bytes` on-chain. The API returns a string (`"DELIVERED"`), but the consumer needs the hex of the UTF-8 bytes. Hence the `xxd -p` in 5.7.
+4. **Out-of-sync signature vectors**: if you touch `signature_vectors.rs`, you must re-paste `test_oracle_vk` and `test_oracle_sig` into `onchain/validators/oracle.ak` (lines 50-54). Same for `cbor_alignment_tests.ak` when the `OracleData` hex changes.
