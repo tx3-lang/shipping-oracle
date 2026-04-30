@@ -120,7 +120,7 @@ tx consume_oracle_data(
 ) {
     input funds {
         from: Consumer,
-        min_amount: fees + min_utxo(attested),
+        min_amount: fees + min_utxo(attested) + min_utxo(change),
     }
 
     reference governance {
