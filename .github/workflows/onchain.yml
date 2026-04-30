@@ -36,8 +36,31 @@ jobs:
             onchain/.aiken
           key: ${{ runner.os }}-aiken-${{ hashFiles('onchain/aiken.lock') }}
 
-      - name: Run aiken check
-        run: aiken check
+      - name: Run aiken check (with report)
+        run: |
+          mkdir -p reports
+          set -o pipefail
+          aiken check 2>&1 | tee reports/aiken-check.txt
+
+      - name: Upload aiken check report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aiken-check-report
+          path: onchain/reports/aiken-check.txt
+          retention-days: 90
+          if-no-files-found: warn
+
+      - name: Append aiken check to job summary
+        if: always()
+        run: |
+          {
+            echo "## Aiken check output"
+            echo
+            echo '```'
+            cat reports/aiken-check.txt 2>/dev/null || echo "(no report produced)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   build:
     name: Build
