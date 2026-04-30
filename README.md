@@ -1,251 +1,144 @@
 # Shipping Oracle
 
-**A Cardano oracle for tracking shipments**
+**A Cardano pull-based oracle for shipment tracking**
 
-Shipping Oracle enables trustless, verifiable shipment status verification by combining on-chain smart contracts with off-chain oracle services. Customers create tracking requests on-chain, and an oracle service monitors real-world shipment status via carrier APIs, updating the blockchain when shipments reach final states.
+Shipping Oracle exposes signed, verifiable shipment status information to any Cardano smart contract. The architecture is inspired by [Pyth](https://pyth.network): the oracle never submits transactions itself — it publishes a **signed attestation** over HTTP that consumers embed in their own transactions. On-chain, an Aiken **withdrawal validator** verifies the Ed25519 signature against a governance UTxO identified by a one-shot NFT.
+
+> **Milestone 2 status:** the pull-based architecture is the current design. The previous push-based (cron-polling) model has been retired. See [`spec/001-milestone-2.md`](spec/001-milestone-2.md) for the full implementation plan.
 
 ## How It Works
 
-1. **Track**: A customer creates a tracking request by locking funds in a [Tracking UTxO](#track-shipment) at the Oracle address.
-2. **Poll**: The backend fetcher continuously polls the Oracle address for tracking UTxOs and queries shipment status via Shippo API.
-3. **Close**: When a shipment reaches final status (`DELIVERED`/`NOT_DELIVERED`), the oracle submits a [close-shipment transaction](#close-shipment), unlocking the tracking UTxO and sending the status result to the customer's outbox address.
+1. **Consumer asks** the oracle: `GET /v1/shipment?carrier=usps&tracking_number=...`.
+2. **Oracle fetches** the current status from the carrier API (Shippo), hashes the carrier + tracking number so no PII is exposed on-chain, and **signs** the Plutus-canonical CBOR of `OracleData`.
+3. **Oracle replies** with `data`, `plaintext`, `signature`, `public_key`, and `cbor_hex`.
+4. **Consumer builds** a Cardano transaction that:
+   - adds the governance UTxO as a **reference input** (carries the oracle verification key),
+   - attaches the oracle validator via the **withdrawal trick** (0-lovelace withdrawal from the script's reward address),
+   - passes the signed `OracleRedeemer` in the withdrawal redeemer.
+5. **On-chain validator** finds the governance UTxO via its unique NFT, reads `oracle_vk`, recomputes `serialise_data(OracleData)` and runs `verify_ed25519_signature`.
+
+## Architecture
+
+### Container view (C4)
+
+![C4 container](diagrams/milestone-2-c4-container.png)
+
+### Pull-based sequence
+
+![Pull-based sequence](diagrams/milestone-2-sequence.png)
+
+Sources: [`diagrams/milestone-2-c4-container.puml`](diagrams/milestone-2-c4-container.puml), [`diagrams/milestone-2-sequence.puml`](diagrams/milestone-2-sequence.puml). Regenerate PNGs with `./diagrams/build.sh` (requires Docker; PNGs are committed so GitHub renders them without any build).
 
 ## Project Structure
 
 ```
 shipping-oracle/
-├── backend/          # Rust data fetcher (polls tracking UTxOs, queries Shippo, submits updates)
-├── onchain/          # Aiken validator (validates tracking UTxO spends)
-└── tx3/              # tx3 protocol definitions (publish, track_shipment, close_shipment)
+├── backend/          # Rust HTTP oracle (axum + pallas + ed25519-dalek)
+├── onchain/          # Aiken validators (governance_nft mint + oracle withdraw)
+├── tx3/              # TX3 protocol (publish_scripts, bootstrap_governance, consume_oracle_data)
+├── diagrams/         # PlantUML C4 + sequence diagrams (sources + PNGs)
+└── spec/             # Numbered implementation specs
 ```
 
-**Component Documentation:**
-- [Backend Documentation](backend/README.md) - Data fetcher setup and operation
-- [On-chain Documentation](onchain/README.md) - Validator logic and validation rules
-- [Tx3 Documentation](tx3/README.md) - Protocol definitions and transactions
+## HTTP API
 
-## Architecture
+### `GET /v1/shipment`
 
-### System Overview (C4 Container)
-![c4-container](diagrams/c4-container.png)
+```
+GET /v1/shipment?carrier=usps&tracking_number=ABC123
+```
 
-### Components
+Response:
 
-#### Backend
-Scheduled Rust service that continuously monitors the Cardano blockchain for tracking UTxOs. For each tracking UTxO found, it queries the Shippo API to retrieve real-world shipment status. When a shipment reaches a final state (delivered or not delivered), the backend constructs and submits a close-shipment transaction to update the on-chain status and collect the oracle payment.
-
-**Key Responsibilities:**
-- Poll Oracle address for tracking UTxOs via Blockfrost
-- Query Shippo API for shipment tracking status
-- Determine if shipment status is final
-- Build and submit close-shipment transactions via tx3/TRP
-- Execute on configurable cron schedule
-
-#### On-chain
-Aiken validator that governs tracking UTxO spends. Enforces critical rules to ensure tracking requests can only be closed by authorized oracles with valid shipment statuses.
-
-**Validation Rules:**
-- Transaction must have exactly two outputs (shipment + payment)
-- Shipment output must go to the outbox address specified in TrackingDatum
-- Shipment output must contain valid ShipmentDatum with matching carrier/tracking number
-- Status must be either "DELIVERED" or "NOT_DELIVERED"
-- Oracle must sign the transaction (verified via extra signatories)
-- Payment output must send at least `tracking_price` lovelace to payment address
-- Payment output must have no datum attached
-
-#### Tx3
-Protocol definitions written in tx3 that specify the structure and rules for all Cardano transactions in the system. Compiled into transaction intermediate representation (TIR) that can be resolved into concrete Cardano transactions via the TRP service.
-
-**Transactions:**
-- `publish`: Publishes validator script on-chain as a reference script
-- `track_shipment`: Creates tracking UTxO with customer's carrier and tracking number
-- `close_shipment`: Consumes tracking UTxO and emits shipment status result
-
-## Main Concepts
-
-### Oracle
-The operator running the backend fetcher service. The oracle continuously monitors tracking UTxOs, queries real-world shipment status from carrier APIs, and submits close-shipment transactions when shipments reach final status. The oracle signs close-shipment transactions with their private key and receives payment for providing tracking updates.
-
-### Customer
-User creating shipment tracking requests. The customer funds tracking UTxOs with ADA to initiate tracking, specifying the carrier, tracking number, and outbox address where they want to receive the final status result.
-
-### Outbox Address
-Destination address where the shipment status output (ShipmentDatum) is sent when a tracking request is closed. This address is specified by the customer in the TrackingDatum and controls where the final tracking result is delivered.
-
-### Payment Address
-Address that receives the oracle's payment when a shipment is successfully closed. This address is configured in the validator and compensates the oracle for monitoring shipments and providing status updates. The payment comes from the funds originally locked in the tracking UTxO.
-
-## Transactions
-
-### Track Shipment
-
-Creates a tracking request on-chain by locking funds at the Oracle address.
-
-**Purpose**: Customer initiates shipment tracking by creating a tracking UTxO containing carrier and tracking number information.
-
-#### Data Structures
-
-**Inputs:**
-- Customer funds UTxO containing sufficient ADA (to cover tracking price deposit + fees + change)
-
-**Outputs:**
-- **Tracking UTxO** (locked at Oracle address)
-  - Value: `TRACKING_PRICE` ADA + min UTxO requirement
-  - Datum: `TrackingDatum`
-- **Change UTxO** (returned to customer)
-  - Value: Remaining ADA after tracking deposit and fees
-
-**TrackingDatum:**
-```aiken
-type TrackingDatum {
-  carrier: ByteArray,           // e.g., "usps", "fedex", "ups"
-  tracking_number: ByteArray,   // Shipment tracking number
-  outbox_address: Address,      // Where to send final status result
+```json
+{
+  "data": {
+    "carrier_hash": "abc…",
+    "tracking_number_hash": "def…",
+    "status": "DELIVERED",
+    "timestamp": 1712000000
+  },
+  "plaintext": {
+    "carrier": "usps",
+    "tracking_number": "ABC123"
+  },
+  "signature": "hex…",
+  "public_key": "hex…",
+  "cbor_hex": "d8799f…ff"
 }
 ```
 
-**Comments:**
-- The `TRACKING_PRICE` value depends on the configured parameter on the on-chain validator. More information [here](onchain/README.md#parameters).
+| Field          | What it is                                                                 | On-chain use               |
+| -------------- | -------------------------------------------------------------------------- | -------------------------- |
+| `data`         | Hashed identifiers + status + timestamp                                    | Contents of `OracleData`   |
+| `plaintext`    | Original carrier / tracking number (UX only, never signed)                 | —                          |
+| `signature`    | Ed25519 over `cbor_hex` bytes                                              | Redeemer `signature`       |
+| `public_key`   | Oracle verification key (32 bytes, matches `GovernanceDatum.oracle_vk`)    | Verified against governance UTxO |
+| `cbor_hex`     | Canonical CBOR of the PlutusData form of `data` — **embed these bytes verbatim** | Redeemer `data` (raw) |
 
-#### Transaction Diagram
+The status vocabulary is `DELIVERED`, `NOT_DELIVERED`, `IN_TRANSIT`, `PRE_TRANSIT`, `UNKNOWN`. Consumers decide what to do with non-final states (unlike the old model, which only surfaced final statuses).
 
-```mermaid
----
-config:
-  flowchart:
-    curve: stepBefore
----
-flowchart LR
-  I1@{ shape: brace-r, label: "Customer wallet<br/>━━━━━━━━━━━━<br/>Address: Customer<br/>Value: (N + minADA) ADA" }
+### `GET /health`
 
-  TX@{ label: "<br/><br/><br/><br/><br/><br/><br/><br/><br/>&nbsp;&nbsp;&nbsp;&nbsp;Track Shipment&nbsp;&nbsp;&nbsp;&nbsp;<br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>"}
+Liveness probe, returns `{ "status": "ok" }`.
 
-  O1@{ shape: brace-l, label: "Tracking UTxO<br/>━━━━━━━━━━━━━<br/>Address: Oracle<br/>Value: (N + minADA) ADA<br/>Datum: TrackingDatum<br/>{ carrier, tracking_number, outbox_address}"}
+## Data Types
 
-  O2@{ shape: brace-l, label: "Change UTxO<br/>━━━━━━━━━━━━━<br/>Address: Customer<br/>Value: K ADA"}
+### Off-chain (Rust) and on-chain (Aiken) stay byte-aligned
 
-  I1 --> TX
-  TX --> O1
-  TX --> O2
+`OracleData` is serialised as `PlutusData::Constr(0, [carrier_hash, tracking_number_hash, status, timestamp])` with an **indefinite-length** field array — byte-identical between `pallas::codec::minicbor` and Aiken's `builtin.serialise_data`. This alignment is the #1 technical risk and is verified by [`backend/tests/cbor_alignment.rs`](backend/tests/cbor_alignment.rs) and [`onchain/lib/cbor_alignment_tests.ak`](onchain/lib/cbor_alignment_tests.ak) using three shared test vectors.
 
-  Note@{ shape: rounded, label: "where:<br/>- N: tracking price<br/>- K: remaining ADA after tracking deposit and fees" }
-```
-
-### Close Shipment
-
-Oracle closes the tracking request by consuming the tracking UTxO and emitting the final shipment status.
-
-**Purpose**: Consume tracking UTxO and emit shipment status result to the customer's outbox address while paying the oracle for their service.
-
-#### Data Structures
-
-**Inputs:**
-- **Tracking UTxO** (from Oracle)
-  - Value: `TRACKING_PRICE` ADA + min UTxO
-  - Datum: `TrackingDatum`
-  - Redeemer: `ConsumeTracking`
-
-**Outputs:**
-- **Shipment UTxO** (to outbox address)
-  - Value: min UTxO requirement (~2 ADA)
-  - Datum: `ShipmentDatum`
-- **Payment UTxO** (to payment address)
-  - Value: `TRACKING_PRICE` ADA (tracking deposit minus shipment UTxO value and fees)
-  - Datum: None
-
-**Redeemer:**
 ```aiken
-type TrackingRedeemer {
-  ConsumeTracking    // Signals intent to close tracking request
+// onchain/lib/types.ak
+type GovernanceDatum { oracle_vk: ByteArray }
+
+type OracleData {
+  carrier_hash: ByteArray,
+  tracking_number_hash: ByteArray,
+  status: ByteArray,
+  timestamp: Int,
+}
+
+type OracleRedeemer {
+  data: OracleData,
+  signature: ByteArray,
 }
 ```
 
-**ShipmentDatum:**
-```aiken
-type ShipmentDatum {
-  carrier: ByteArray,              // Matches TrackingDatum.carrier
-  tracking_number: ByteArray,      // Matches TrackingDatum.tracking_number
-  status: ByteArray,               // "DELIVERED" or "NOT_DELIVERED"
-  timestamp: Int,                  // Unix timestamp when status was recorded
-  oracle_pkh: VerificationKeyHash, // Oracle's public key hash (for verification)
-}
+### On-chain identity via one-shot NFT
+
+The governance UTxO (the UTxO whose datum holds `oracle_vk`) is identified by a unique token minted by a one-shot minting policy that requires consuming a specific seed UTxO. Anyone can send UTxOs to the oracle's address, but only **one** UTxO in the universe carries the governance NFT. Rotating the oracle key = move the NFT to a new UTxO.
+
+## Running Locally
+
+```bash
+# 1. On-chain: compile validators + run tests
+cd onchain
+aiken check            # unit tests + CBOR alignment
+aiken build            # emit plutus.json
+
+# 2. Backend: run unit + HTTP integration tests (no network access required,
+#    Shippo is stubbed via wiremock)
+cd ../backend
+cargo test             # backend/tests/*.rs + backend/tests/cbor_alignment.rs
+
+# 3. Backend: run the HTTP server (requires Shippo + Cardano env vars)
+cp .env.example .env   # fill ORACLE_SK, SHIPPO_API_KEY, TRP_URL, ...
+cargo run
+curl 'http://localhost:3000/v1/shipment?carrier=usps&tracking_number=...'
 ```
 
-**Comments:**
-- The `TRACKING_PRICE` value depends on the configured parameter on the on-chain validator. More information [here](onchain/README.md#parameters).
+### Required env
 
-#### Transaction Diagram
-
-```mermaid
----
-config:
-  flowchart:
-    curve: stepBefore
----
-flowchart LR
-  I1@{ shape: brace-r, label: "Tracking UTxO<br/>━━━━━━━━━━━━━━<br/>Address: Oracle<br/>Value: (N + minADA) ADA<br/>Datum: TrackingDatum<br/>{ carrier, tracking_number, outbox_address}"}
-
-  TX["`<br/><br/><br/><br/><br/>Close Shipment<br/>━━━━━━━━━━━━━━━━━<br/>**Validates**<br/>✓ Oracle signature present<br/>✓ Status is valid<br/>(_DELIVERED_ / _NOT_DELIVERED_)<br/>✓ Payment ≥ tracking_price<br/>✓ Shipment datum matches tracking<br/>✓ Two outputs only<br/><br/><br/><br/><br/><br/><br/>`"]
-
-  O1@{ shape: brace-l, label: "Shipment UTxO<br/>━━━━━━━━━━━━━━<br/>Address: Outbox<br/>Value: minADA ADA<br/>Datum: ShipmentDatum<br/>{carrier, tracking_number,<br/>status, timestamp, oracle_pkh}"}
-
-  O2@{ shape: brace-l, label: "Payment UTxO<br/>━━━━━━━━━━━━━━<br/>Address: Payment<br/>Value: N ADA<br/>Datum: None"}
-
-  I1 --ConsumeTracking--> TX
-  TX --> O1
-  TX --> O2
-
-  Note@{ shape: rounded, label: "where:<br/>- N: tracking price" }
-```
-
-## Data Structures
-
-All on-chain data types used across the protocol.
-
-### TrackingDatum
-
-Attached to tracking UTxOs locked at the Oracle address. Contains the shipment information and destination for results.
-
-```aiken
-type TrackingDatum {
-  carrier: ByteArray,           // Carrier identifier (e.g., "usps", "fedex", "ups")
-  tracking_number: ByteArray,   // Shipment tracking number from carrier
-  outbox_address: Address,      // Cardano address to receive ShipmentDatum result
-}
-```
-
-### ShipmentDatum
-
-Attached to shipment UTxOs sent to the outbox address. Contains the final tracking status and verification information.
-
-```aiken
-type ShipmentDatum {
-  carrier: ByteArray,              // Carrier identifier (must match TrackingDatum)
-  tracking_number: ByteArray,      // Tracking number (must match TrackingDatum)
-  status: ByteArray,               // Final status: "DELIVERED" or "NOT_DELIVERED"
-  timestamp: Int,                  // Unix timestamp when status was determined
-  oracle_pkh: VerificationKeyHash, // Public key hash of oracle that submitted update
-}
-```
-
-### TrackingRedeemer
-
-Used when spending tracking UTxOs from the Oracle.
-
-```aiken
-type TrackingRedeemer {
-  ConsumeTracking    // Single variant indicating tracking request closure
-}
-```
-
-### Status Constants
-
-Valid shipment status values enforced by the validator.
-
-```aiken
-pub const status_delivered: ByteArray = "DELIVERED"
-pub const status_not_delivered: ByteArray = "NOT_DELIVERED"
-```
+| Variable          | Purpose                                                  |
+| ----------------- | -------------------------------------------------------- |
+| `SHIPPO_API_KEY`  | Shippo tracking API token                                |
+| `ORACLE_SK`       | Oracle Ed25519 signing key (32 bytes, hex)               |
+| `ORACLE_PKH`      | Oracle verification key hash (28 bytes, hex)             |
+| `ORACLE_ADDRESS`  | Cardano address the oracle controls                      |
+| `TRP_URL`         | TRP endpoint (used by consumers to resolve tx3 txs)      |
+| `LISTEN_ADDRESS`  | HTTP bind address (optional, default `0.0.0.0:3000`)     |
+| `TRP_API_KEY`     | Optional — required for hosted TRPs                      |
 
 ## License
 

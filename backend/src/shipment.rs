@@ -5,58 +5,67 @@ use crate::config::Config;
 use crate::models::{TrackingResponse, TrackingStatus};
 
 pub struct ShipmentClient {
-    config: Config,
+    shippo_api_key: String,
+    base_url: String,
     http_client: Client,
 }
 
 impl ShipmentClient {
-    pub fn new(config: Config) -> Result<Self> {
+    pub fn new(config: &Config) -> Result<Self> {
+        Self::with_base_url(config, "https://api.goshippo.com".to_string())
+    }
+
+    pub fn with_base_url(config: &Config, base_url: String) -> Result<Self> {
         let http_client = Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()
-            .context("Failed to create HTTP client")?;
-        
-        Ok(Self { config, http_client })
+            .context("failed to create HTTP client")?;
+
+        Ok(Self {
+            shippo_api_key: config.shippo_api_key.clone(),
+            base_url,
+            http_client,
+        })
     }
 
-    pub async fn fetch_shipment_status(&self, carrier: &str, tracking_number: &str) -> Result<TrackingStatus> {
-        let url = format!(
-            "https://api.goshippo.com/tracks/{}/{}",
-            carrier,
-            tracking_number
-        );
+    pub async fn fetch_shipment_status(
+        &self,
+        carrier: &str,
+        tracking_number: &str,
+    ) -> Result<TrackingStatus> {
+        let url = format!("{}/tracks/{carrier}/{tracking_number}", self.base_url);
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&url)
-            .header("Authorization", format!("ShippoToken {}", self.config.shippo_api_key))
+            .header("Authorization", format!("ShippoToken {}", self.shippo_api_key))
             .send()
             .await
-            .context("Failed to send request to Shipment API")?;
+            .context("failed to send request to Shippo")?;
 
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            anyhow::bail!(
-                "Shipment API query failed (status {}): {}",
-                status,
-                body
-            );
+            anyhow::bail!("Shippo query failed (status {status}): {body}");
         }
 
-        let tracking: TrackingResponse = response
-            .json()
-            .await
-            .context("Failed to parse Shipment API response")?;
+        let tracking: TrackingResponse =
+            response.json().await.context("failed to parse Shippo response")?;
 
         Ok(tracking.tracking_status)
     }
 }
 
-pub fn get_status(tracking_status: &TrackingStatus) -> Option<String> {
+/// Map Shippo's status vocabulary to the one we expose on-chain.
+///
+/// Shippo docs: https://docs.goshippo.com/docs/tracking/statuses
+pub fn normalize_status(tracking_status: &TrackingStatus) -> String {
     match tracking_status.status.as_str() {
-        "DELIVERED" => Some("DELIVERED".to_string()),
-        "RETURNED" => Some("NOT_DELIVERED".to_string()),
-        "FAILURE" => Some("NOT_DELIVERED".to_string()),
-        _ => None,
+        "DELIVERED" => "DELIVERED",
+        "FAILURE" | "RETURNED" => "NOT_DELIVERED",
+        "TRANSIT" => "IN_TRANSIT",
+        "PRE_TRANSIT" => "PRE_TRANSIT",
+        _ => "UNKNOWN",
     }
+    .to_string()
 }

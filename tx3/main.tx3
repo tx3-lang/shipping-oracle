@@ -1,121 +1,168 @@
 party Oracle;
-party Customer;
-party Outbox;
-party Payment;
+party Consumer;
 
 env {
-    validator_script_bytes: Bytes,
-    validator_script_ref: UtxoRef,
-    oracle_pkh: Bytes,
+    governance_nft_script: Bytes,
+    oracle_script: Bytes,
+    oracle_script_hash: Address,
+    oracle_script_ref: UtxoRef,
+    oracle_vk: Bytes,
+    gov_policy_id: Bytes,
+    gov_asset_name: Bytes,
+    seed_utxo_ref: UtxoRef,
+    governance_utxo_ref: UtxoRef,
 }
 
-type TrackingDatum {
-    carrier: Bytes,
-    tracking_number: Bytes,
-    outbox_address: Bytes,
+type GovernanceDatum {
+    oracle_vk: Bytes,
 }
 
-type ShipmentDatum {
-    carrier: Bytes,
-    tracking_number: Bytes,
+type OracleData {
+    carrier_hash: Bytes,
+    tracking_number_hash: Bytes,
     status: Bytes,
     timestamp: Int,
-    oracle_pkh: Bytes,
 }
 
-tx publish() {
+type OracleRedeemer {
+    data: OracleData,
+    signature: Bytes,
+}
+
+// One-time: publishes governance_nft mint policy and oracle withdrawal
+// validator as on-chain reference scripts. Consumers then attach them by
+// reference, keeping their transactions small.
+tx publish_scripts() {
     locals {
-        quantity: 6000000,
+        deposit: 5000000,
     }
 
     input funds {
         from: Oracle,
-        min_amount: Ada(quantity),
+        min_amount: fees + Ada(deposit) + Ada(deposit),
     }
-    
+
     cardano::publish {
         to: Oracle,
-        amount: Ada(quantity),
+        amount: Ada(deposit),
         version: 3,
-        script: validator_script_bytes,
+        script: governance_nft_script,
+    }
+
+    cardano::publish {
+        to: Oracle,
+        amount: Ada(deposit),
+        version: 3,
+        script: oracle_script,
     }
 
     output change {
         to: Oracle,
-        amount: funds - Ada(quantity) - fees,
+        amount: funds - Ada(deposit) - Ada(deposit) - fees,
     }
 }
 
-tx track_shipment(
-    p_carrier: Bytes,
-    p_tracking_number: Bytes,
-) {
+// One-time: mints the governance NFT and locks it in a UTxO carrying the
+// current oracle verification key. Consuming `seed_utxo_ref` enforces the
+// one-shot minting policy so the NFT can never be minted again.
+tx bootstrap_governance() {
     locals {
-        quantity: 12000000,
+        gov_nft: AnyAsset(gov_policy_id, gov_asset_name, 1),
     }
 
-    reference validator_script {
-        ref: validator_script_ref,
+    input seed {
+        ref: seed_utxo_ref,
     }
 
     input funds {
-        from: Customer,
-        min_amount: fees + Ada(quantity) + min_utxo(tracking),
+        from: Oracle,
+        min_amount: fees + min_utxo(governance),
     }
 
-    output tracking {
+    mint {
+        amount: gov_nft,
+        redeemer: (),
+    }
+
+    cardano::plutus_witness {
+        version: 3,
+        script: governance_nft_script,
+    }
+
+    output governance {
         to: Oracle,
-        amount: Ada(quantity) + min_utxo(tracking),
-        datum: TrackingDatum {
-            carrier: p_carrier,
-            tracking_number: p_tracking_number,
-            outbox_address: Outbox,
+        amount: gov_nft + min_utxo(governance),
+        datum: GovernanceDatum {
+            oracle_vk: oracle_vk,
         },
     }
 
     output change {
-        to: Customer,
-        amount: funds - Ada(quantity) - min_utxo(tracking) - fees,
-    }
-}
-
-tx close_shipment(
-    p_utxo_ref: UtxoRef,
-    p_status: Bytes,
-    p_timestamp: Int,
-) {
-    locals {
-        p_oracle_pkh: oracle_pkh,
-    }
-
-    reference validator_script {
-        ref: validator_script_ref,
-    }
-
-    input tracking {
-        ref: p_utxo_ref,
-        datum_is: TrackingDatum,
-    }
-
-    output shipment {
-        to: Outbox,
-        amount: min_utxo(shipment),
-        datum: ShipmentDatum {
-            carrier: tracking.carrier,
-            tracking_number: tracking.tracking_number,
-            status: p_status,
-            timestamp: p_timestamp,
-            oracle_pkh: p_oracle_pkh,
-        },
-    }
-
-    output change {
-        to: Payment,
-        amount: tracking - min_utxo(shipment) - fees,
+        to: Oracle,
+        amount: seed + funds - min_utxo(governance) - fees,
     }
 
     collateral {
         from: Oracle,
+        min_amount: fees,
+    }
+}
+
+// Demo consumer tx: retrieves signed OracleData from the backend, the
+// on-chain oracle validator runs under the `withdraw` purpose and verifies
+// the Ed25519 signature against the governance UTxO's inline datum.
+tx consume_oracle_data(
+    p_carrier_hash: Bytes,
+    p_tracking_number_hash: Bytes,
+    p_status: Bytes,
+    p_timestamp: Int,
+    p_signature: Bytes,
+) {
+    input funds {
+        from: Consumer,
+        min_amount: fees + min_utxo(attested),
+    }
+
+    reference governance {
+        ref: governance_utxo_ref,
+    }
+
+    reference oracle {
+        ref: oracle_script_ref,
+    }
+
+    cardano::withdrawal {
+        from: oracle_script_hash,
+        amount: 0,
+        redeemer: OracleRedeemer {
+            data: OracleData {
+                carrier_hash: p_carrier_hash,
+                tracking_number_hash: p_tracking_number_hash,
+                status: p_status,
+                timestamp: p_timestamp,
+            },
+            signature: p_signature,
+        },
+    }
+
+    output attested {
+        to: Consumer,
+        amount: min_utxo(attested),
+        datum: OracleData {
+            carrier_hash: p_carrier_hash,
+            tracking_number_hash: p_tracking_number_hash,
+            status: p_status,
+            timestamp: p_timestamp,
+        },
+    }
+
+    output change {
+        to: Consumer,
+        amount: funds - min_utxo(attested) - fees,
+    }
+
+    collateral {
+        from: Consumer,
         min_amount: fees,
     }
 }

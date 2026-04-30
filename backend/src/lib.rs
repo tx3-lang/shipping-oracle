@@ -1,8 +1,6 @@
-pub mod blockchain;
+pub mod api;
 pub mod config;
-pub mod fetcher;
 pub mod models;
-pub mod scheduler;
+pub mod oracle_service;
 pub mod shipment;
-pub mod submitter;
 pub mod tx3;

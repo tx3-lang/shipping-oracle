@@ -1,0 +1,47 @@
+@startuml milestone-2-sequence
+
+title Shipping Oracle — Pull-based Flow (Milestone 2)
+
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor "Consumer" as C
+participant "Oracle API" as O
+participant "Shippo API" as S
+participant "Cardano Ledger" as L
+participant "Oracle\nValidator" as V
+
+C -> O: GET /v1/shipment?carrier=X&tracking_number=Y
+O -> S: GET /tracks/X/Y
+S --> O: TrackingStatus
+
+note over O
+  hash(carrier), hash(tracking_number)
+  build OracleData
+  serialise_data → CBOR
+  sign w/ Ed25519
+end note
+
+O --> C: { data, plaintext, signature, public_key, cbor_hex }
+
+note over C
+  Build tx:
+  • reference_input = governance UTxO (NFT)
+  • reference_script = oracle validator
+  • withdrawal 0 ADA from script reward addr
+  • redeemer = OracleRedeemer { data, signature }
+end note
+
+C -> L: Submit tx
+L -> V: Run withdraw(redeemer, tx)
+V -> L: Read governance UTxO via NFT
+
+note over V
+  serialise_data(redeemer.data)
+  verify_ed25519_signature(oracle_vk, msg, sig)
+end note
+
+V --> L: ok
+L --> C: tx accepted
+
+@enduml
