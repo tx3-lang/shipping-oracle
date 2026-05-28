@@ -1,0 +1,29 @@
+[package]
+name = "shipping-oracle-sdk"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "Rust SDK for fetching, verifying, and preparing Shipping Oracle attestations"
+
+[lib]
+name = "shipping_oracle_sdk"
+path = "src/lib.rs"
+
+[dependencies]
+blake2 = "0.10"
+ed25519-dalek = "2.2.0"
+hex = "0.4"
+pallas = { version = "1.0.0-alpha.4", features = ["hardano", "phase2"] }
+reqwest = { version = "0.11", features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+tokio = { version = "1", features = ["full"] }
+tx3-sdk = "0.11.0"
+
+[dev-dependencies]
+anyhow = "1.0"
+axum = "0.7"
+chrono = "0.4"
+shipping-oracle = { path = "../../backend" }
+wiremock = "0.6"

@@ -1,0 +1,80 @@
+name: SDK CI
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'sdk/rust/**'
+      - '.github/workflows/sdk.yml'
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'sdk/rust/**'
+      - '.github/workflows/sdk.yml'
+  workflow_dispatch:
+
+jobs:
+  rust-sdk:
+    name: Rust SDK tests + report
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./sdk/rust
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-sdk-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-sdk-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: sdk/rust/target
+          key: ${{ runner.os }}-sdk-cargo-target-${{ hashFiles('sdk/rust/Cargo.toml', 'backend/Cargo.toml', 'backend/Cargo.lock') }}
+
+      - name: Run SDK tests
+        run: cargo test --all-targets -- --nocapture
+
+      - name: Upload SDK integration JSON report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-integration-report-json
+          path: sdk/rust/reports/sdk-integration.json
+          retention-days: 90
+          if-no-files-found: warn
+
+      - name: Upload SDK integration Markdown report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-integration-report-md
+          path: sdk/rust/reports/sdk-integration.md
+          retention-days: 90
+          if-no-files-found: warn
+
+      - name: Append SDK report to job summary
+        if: always()
+        run: |
+          if [ -f reports/sdk-integration.md ]; then
+            cat reports/sdk-integration.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No sdk-integration.md report was produced." >> "$GITHUB_STEP_SUMMARY"
+          fi
