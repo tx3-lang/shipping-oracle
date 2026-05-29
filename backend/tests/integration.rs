@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use ed25519_dalek::{Signature, SigningKey, Verifier};
+use ed25519_dalek::{Signature, Verifier};
 use pallas::codec::minicbor;
 use serde_json::json;
 use tokio::net::TcpListener;
@@ -16,8 +16,7 @@ use shipping_oracle::oracle_service::{
 };
 use shipping_oracle::shipment::ShipmentClient;
 
-const TEST_SK_HEX: &str =
-    "0101010101010101010101010101010101010101010101010101010101010101";
+const TEST_SK_HEX: &str = "0101010101010101010101010101010101010101010101010101010101010101";
 const SHIPPO_CARRIER: &str = "shippo";
 const DELIVERED_TRACKING: &str = "SHIPPO_DELIVERED";
 const TRANSIT_TRACKING: &str = "SHIPPO_TRANSIT";
@@ -48,7 +47,9 @@ async fn start_oracle(shippo_base_url: String) -> TestServer {
         Box::new(|| FROZEN_TIMESTAMP),
     ));
 
-    let listener = TcpListener::bind(&config.listen_address).await.expect("bind");
+    let listener = TcpListener::bind(&config.listen_address)
+        .await
+        .expect("bind");
     let addr = listener.local_addr().expect("local addr");
     let app = api::create_router(service);
     let handle = tokio::spawn(async move {
@@ -87,14 +88,18 @@ fn assert_signature_round_trip(response: &SignedOracleResponse) {
     let signature = Signature::from_bytes(&sig_bytes);
 
     let cbor_bytes = hex::decode(&response.cbor_hex).expect("cbor hex");
-    vk.verify(&cbor_bytes, &signature).expect("signature must verify");
+    vk.verify(&cbor_bytes, &signature)
+        .expect("signature must verify");
 }
 
 fn assert_cbor_matches_plaintext(response: &SignedOracleResponse) {
     let carrier_hash = blake2b256(response.plaintext.carrier.as_bytes());
     let tracking_hash = blake2b256(response.plaintext.tracking_number.as_bytes());
     assert_eq!(hex::encode(&carrier_hash), response.data.carrier_hash);
-    assert_eq!(hex::encode(&tracking_hash), response.data.tracking_number_hash);
+    assert_eq!(
+        hex::encode(&tracking_hash),
+        response.data.tracking_number_hash
+    );
 
     let plutus = plutus_oracle_data(
         carrier_hash,
@@ -179,7 +184,9 @@ async fn shipment_endpoint_maps_transit_and_unknown_statuses() {
 async fn shipment_endpoint_surfaces_upstream_errors_as_bad_gateway() {
     let shippo = MockServer::start().await;
     Mock::given(method("GET"))
-        .and(path(format!("/tracks/{SHIPPO_CARRIER}/{DELIVERED_TRACKING}")))
+        .and(path(format!(
+            "/tracks/{SHIPPO_CARRIER}/{DELIVERED_TRACKING}"
+        )))
         .respond_with(ResponseTemplate::new(500).set_body_string("boom"))
         .mount(&shippo)
         .await;

@@ -11,7 +11,7 @@ Runbook for reproducing every test in the project, from unit tests up to a full 
 | 3 | On-chain unit tests (Aiken) | `aiken check` | none | ~2 s |
 | 4 | On-chain build (two-pass) | `aiken build` ×2 | none | ~5 s |
 | 5 | End-to-end on local devnet | `trix devnet` + tx3 | local Dolos (no testnet needed) | ~1 min |
-| 6 | Rust SDK consumer flow | `cd sdk/rust && cargo test --all-targets -- --nocapture` | none (backend + Shippo stubbed) | ~10 s |
+| 6 | Rust SDK consumer + escrow flow | `cd sdk/rust && cargo test --all-targets -- --nocapture` | none (backend + Shippo stubbed) | ~10 s |
 
 ---
 
@@ -88,6 +88,7 @@ aiken check -m governance_nft # mint policy only
 Coverage:
 
 - `oracle.ak`: `withdraw_valid_signature`, `withdraw_invalid_signature`, `withdraw_tampered_data`, `withdraw_missing_governance_nft`.
+- `escrow.ak`: delivered release and timeout refund scenarios for the ADA escrow template.
 - `governance_nft.ak`: `mint_valid`, `mint_missing_seed_input`, `mint_wrong_asset_name`, `mint_wrong_quantity`, `mint_extra_asset`.
 - `cbor_alignment_tests.ak`: byte vectors pinned against `backend/tests/cbor_alignment.rs`.
 
@@ -168,7 +169,7 @@ cd tx3
 trix invoke -p local           # choose: publish_scripts
 ```
 
-Publishes `governance_nft` and `oracle` as reference scripts. Note the refs (`txhash#ix`) it returns and set them in `tx3/.env.local::ORACLE_SCRIPT_REF`.
+Publishes `governance_nft`, `oracle`, and `escrow` as reference scripts. Note the refs (`txhash#ix`) it returns and set them in `tx3/.env.local::ORACLE_SCRIPT_REF` and `tx3/.env.local::ESCROW_SCRIPT_REF`.
 
 ### 5.5 Bootstrap governance (mint the NFT)
 
@@ -194,6 +195,20 @@ cd backend && cargo run
 
 ### 5.7 Consumer tx (consume_oracle_data)
 
+Recommended: use the Rust SDK example to fetch the attestation, verify it, and write the tx3 args JSON in one step.
+
+```bash
+cd sdk/rust
+ORDER_ID=ord_123 \
+TX3_ARGS_OUT=/tmp/consume_args.json \
+cargo run --example e2e_consume_oracle
+
+cd ../../tx3
+trix invoke -p local --args-json-path /tmp/consume_args.json    # choose: consume_oracle_data
+```
+
+Manual fallback if you want to inspect the raw HTTP response:
+
 ```bash
 RESPONSE=$(curl -fsS "http://localhost:3000/v1/shipment?carrier=shippo&tracking_number=SHIPPO_DELIVERED")
 
@@ -206,9 +221,6 @@ cat > /tmp/consume_args.json <<EOF
   "p_signature":            "$(jq -r '.signature' <<<"$RESPONSE")"
 }
 EOF
-
-cd tx3
-trix invoke -p local --args-json-path /tmp/consume_args.json    # choose: consume_oracle_data
 ```
 
 ### 5.8 Verify on-chain
@@ -220,6 +232,118 @@ trix tx <txhash>                # tx details
 
 If the signature doesn't validate, the script fails and the tx is rejected by the node — that's the on-chain smoke test.
 
+### 5.9 Escrow template transactions
+
+The Milestone 3 ADA escrow tx3 templates are part of `tx3/main.tx3`:
+
+- `lock_escrow_ada` locks buyer ADA at the escrow script for one order/shipment pair.
+- `release_escrow` spends the escrow to `Merchant` when the oracle attests `DELIVERED`.
+- `refund_escrow` spends the escrow back to `Buyer` after `refund_after`.
+
+Before running the escrow flow, set `BUYER` and `MERCHANT` party addresses in `tx3/.env.local`. The `buyer_pkh` and `merchant_pkh` args must be the 28-byte payment key hashes for those same addresses.
+
+If you have cardano-cli compatible payment vkey files, derive them with:
+
+```bash
+cardano-cli address key-hash --payment-verification-key-file buyer.vkey
+cardano-cli address key-hash --payment-verification-key-file merchant.vkey
+```
+
+#### 5.9.1 Lock escrow for a delivered shipment
+
+Use the SDK example to fetch and verify the attestation, link it to the order id, and write the `lock_escrow_ada` tx3 args JSON:
+
+```bash
+cd ../sdk/rust
+BUYER_PKH=<28-byte buyer payment key hash hex> \
+MERCHANT_PKH=<28-byte merchant payment key hash hex> \
+ORDER_ID=ord_escrow_release_001 \
+ESCROW_LOVELACE=10000000 \
+LOCK_ESCROW_ARGS_OUT=/tmp/lock_escrow_release_args.json \
+cargo run --example e2e_escrow_flow
+```
+
+Submit the lock transaction:
+
+```bash
+cd ../../tx3
+trix invoke -p local --args-json-path /tmp/lock_escrow_release_args.json    # choose: lock_escrow_ada
+```
+
+Capture the UTxO locked at the escrow script from the command output or by querying the buyer/escrow address. Export it as `<lock_tx_hash>#<output_index>`:
+
+```bash
+export ESCROW_UTXO=<lock_tx_hash>#<output_index>
+```
+
+#### 5.9.2 Release escrow after DELIVERED
+
+Rerun the SDK example with `ESCROW_UTXO`; it will write both release and refund args for that locked UTxO:
+
+```bash
+cd ../sdk/rust
+BUYER_PKH=<28-byte buyer payment key hash hex> \
+MERCHANT_PKH=<28-byte merchant payment key hash hex> \
+ORDER_ID=ord_escrow_release_001 \
+ESCROW_UTXO=$ESCROW_UTXO \
+RELEASE_ESCROW_ARGS_OUT=/tmp/release_escrow_args.json \
+REFUND_ESCROW_ARGS_OUT=/tmp/refund_escrow_args.json \
+cargo run --example e2e_escrow_flow
+```
+
+Submit the release transaction:
+
+```bash
+cd ../../tx3
+trix invoke -p local --args-json-path /tmp/release_escrow_args.json    # choose: release_escrow
+```
+
+Expected result: the escrow input is spent and the funds are paid to `MERCHANT`. If you change `SHIPMENT_TRACKING_NUMBER` to a non-delivered demo tracking number, the validator rejects the release because `status != DELIVERED`.
+
+#### 5.9.3 Refund escrow after timeout
+
+Use a separate escrow UTxO for the refund path. Set `REFUND_AFTER=0` so the timeout is immediately satisfied on the local devnet:
+
+```bash
+cd ../sdk/rust
+BUYER_PKH=<28-byte buyer payment key hash hex> \
+MERCHANT_PKH=<28-byte merchant payment key hash hex> \
+ORDER_ID=ord_escrow_refund_001 \
+ESCROW_LOVELACE=10000000 \
+REFUND_AFTER=0 \
+LOCK_ESCROW_ARGS_OUT=/tmp/lock_escrow_refund_args.json \
+cargo run --example e2e_escrow_flow
+
+cd ../../tx3
+trix invoke -p local --args-json-path /tmp/lock_escrow_refund_args.json    # choose: lock_escrow_ada
+export REFUND_ESCROW_UTXO=<refund_lock_tx_hash>#<output_index>
+```
+
+Generate and submit the refund args:
+
+```bash
+cd ../sdk/rust
+BUYER_PKH=<28-byte buyer payment key hash hex> \
+MERCHANT_PKH=<28-byte merchant payment key hash hex> \
+ORDER_ID=ord_escrow_refund_001 \
+REFUND_AFTER=0 \
+ESCROW_UTXO=$REFUND_ESCROW_UTXO \
+REFUND_ESCROW_ARGS_OUT=/tmp/refund_escrow_args.json \
+cargo run --example e2e_escrow_flow
+
+cd ../../tx3
+trix invoke -p local --args-json-path /tmp/refund_escrow_args.json    # choose: refund_escrow
+```
+
+Expected result: the escrow input is spent and the funds are paid back to `BUYER`. If `refund_after` is in the future, the validator rejects the refund until the transaction validity range starts after that timeout.
+
+The on-chain behavior is covered by `aiken check` tests in `onchain/validators/escrow.ak`. The tx3 protocol shape is checked with:
+
+```bash
+cd tx3
+trix check
+```
+
 ---
 
 ## 6. Rust SDK tests
@@ -229,9 +353,9 @@ cd sdk/rust
 cargo test --all-targets -- --nocapture
 ```
 
-The SDK suite spins up the existing backend server logic locally, stubs Shippo via `wiremock`, and verifies the consumer-side flow end-to-end:
+The SDK suite spins up the existing backend server logic locally, stubs Shippo via `wiremock`, and verifies the consumer-side and escrow argument-generation flows end-to-end:
 
-- `tests/client.rs` checks health, typed fetches, and context-linked commitment preparation.
+- `tests/client.rs` checks health, typed fetches, context-linked commitment preparation, and tx3 args for `consume_oracle_data`, `lock_escrow_ada`, `release_escrow`, and `refund_escrow`.
 - `tests/verification.rs` checks expected-key pinning and tamper detection.
 - `tests/report.rs` writes `sdk/rust/reports/sdk-integration.{json,md}` with tx3-ready args for every supported status path plus the upstream-error case.
 
@@ -244,4 +368,5 @@ CI uploads both report files as workflow artifacts from `.github/workflows/sdk.y
 1. **Skipping the second `aiken build`** after changing `gov_policy_id` or `seed_utxo_*` in `aiken.toml` → on-chain compiles with the placeholder and fails at runtime.
 2. **`oracle_vk` out of sync** between `backend/.env` (`ORACLE_SK`) and the `GovernanceDatum` minted in 5.5 → the signature verifies cryptographically but the validator rejects it because the vk in the datum isn't the one that signed. Re-mint governance, or reconfigure `ORACLE_SK`.
 3. **`status` as string vs bytes**: the field is `Bytes` on-chain. The API returns a string (`"DELIVERED"`), but the consumer needs the hex of the UTF-8 bytes. Hence the `xxd -p` in 5.7.
+   The Rust SDK example handles this conversion automatically.
 4. **Out-of-sync signature vectors**: if you touch `signature_vectors.rs`, you must re-paste `test_oracle_vk` and `test_oracle_sig` into `onchain/validators/oracle.ak` (lines 50-54). Same for `cbor_alignment_tests.ak` when the `OracleData` hex changes.

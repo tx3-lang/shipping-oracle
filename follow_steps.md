@@ -127,20 +127,16 @@ trix invoke -p local           # choose: bootstrap_governance
 Build the consumer args from the live API response, then submit:
 
 ```bash
-RESPONSE=$(curl -fsS 'http://localhost:3000/v1/shipment?carrier=shippo&tracking_number=SHIPPO_DELIVERED')
+cd sdk/rust
+ORDER_ID=ord_123 \
+TX3_ARGS_OUT=/tmp/consume_args.json \
+cargo run --example e2e_consume_oracle
 
-cat > /tmp/consume_args.json <<EOF
-{
-  "p_carrier_hash":         "$(jq -r '.data.carrier_hash'         <<<"$RESPONSE")",
-  "p_tracking_number_hash": "$(jq -r '.data.tracking_number_hash' <<<"$RESPONSE")",
-  "p_status":               "$(jq -r '.data.status' <<<"$RESPONSE" | xxd -p | tr -d '\n')",
-  "p_timestamp":            $(jq -r '.data.timestamp' <<<"$RESPONSE"),
-  "p_signature":            "$(jq -r '.signature' <<<"$RESPONSE")"
-}
-EOF
-
+cd ../../tx3
 trix invoke -p local --args-json-path /tmp/consume_args.json   # choose: consume_oracle_data
 ```
+
+That example uses the SDK to fetch the oracle attestation, verify it, link it to an application order id, and write the exact args JSON expected by `consume_oracle_data`.
 
 The submitted transaction attaches the oracle validator via the withdrawal trick (0-lovelace withdrawal from the oracle script's reward address); the validator finds the governance UTxO via its NFT, reads the oracle verification key from its inline datum, and verifies the Ed25519 signature against the canonical CBOR of `OracleData`.
 

@@ -25,8 +25,7 @@ use shipping_oracle::oracle_service::{
 };
 use shipping_oracle::shipment::ShipmentClient;
 
-const TEST_SK_HEX: &str =
-    "0101010101010101010101010101010101010101010101010101010101010101";
+const TEST_SK_HEX: &str = "0101010101010101010101010101010101010101010101010101010101010101";
 const SHIPPO_CARRIER: &str = "shippo";
 const FROZEN_TIMESTAMP: i64 = 1712000000;
 
@@ -84,7 +83,9 @@ async fn start_oracle(shippo_base_url: String) -> TestServer {
         Box::new(|| FROZEN_TIMESTAMP),
     ));
 
-    let listener = TcpListener::bind(&config.listen_address).await.expect("bind");
+    let listener = TcpListener::bind(&config.listen_address)
+        .await
+        .expect("bind");
     let addr = listener.local_addr().expect("local addr");
     let app = api::create_router(service);
     let handle = tokio::spawn(async move {
@@ -125,7 +126,8 @@ fn check_signature(response: &SignedOracleResponse) -> Result<()> {
         .map_err(|_| anyhow::anyhow!("sig wrong length"))?;
     let signature = Signature::from_bytes(&sig_bytes);
     let cbor_bytes = hex::decode(&response.cbor_hex).context("cbor hex")?;
-    vk.verify(&cbor_bytes, &signature).context("ed25519 verify")?;
+    vk.verify(&cbor_bytes, &signature)
+        .context("ed25519 verify")?;
     Ok(())
 }
 
@@ -291,7 +293,11 @@ fn render_markdown(report: &Report) -> String {
             c.actual_status.as_deref().unwrap_or("—"),
             c.http_status,
             if c.signature_verified { "✅" } else { "—" },
-            if c.cbor_matches_plaintext { "✅" } else { "—" },
+            if c.cbor_matches_plaintext {
+                "✅"
+            } else {
+                "—"
+            },
             if c.passed { "✅ PASS" } else { "❌ FAIL" },
         ));
     }

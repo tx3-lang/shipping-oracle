@@ -1,9 +1,13 @@
 party Oracle;
 party Consumer;
+party Buyer;
+party Merchant;
 
 env {
     governance_nft_script: Bytes,
     oracle_script: Bytes,
+    escrow_script: Bytes,
+    escrow_script_ref: UtxoRef,
     oracle_script_hash: Address,
     oracle_script_ref: UtxoRef,
     oracle_vk: Bytes,
@@ -12,6 +16,8 @@ env {
     seed_utxo_ref: UtxoRef,
     governance_utxo_ref: UtxoRef,
 }
+
+policy Escrow = 0x6e01db0834deb9cce6a085afedc884f56a5fd31c342e0e0c5eb19acd;
 
 type GovernanceDatum {
     oracle_vk: Bytes,
@@ -29,6 +35,24 @@ type OracleRedeemer {
     signature: Bytes,
 }
 
+type EscrowDatum {
+    buyer: Bytes,
+    merchant: Bytes,
+    order_id: Bytes,
+    carrier_hash: Bytes,
+    tracking_number_hash: Bytes,
+    paid_at: Int,
+    refund_after: Int,
+}
+
+type EscrowRedeemer {
+    Release {
+        data: OracleData,
+        signature: Bytes,
+    },
+    Refund,
+}
+
 // One-time: publishes governance_nft mint policy and oracle withdrawal
 // validator as on-chain reference scripts. Consumers then attach them by
 // reference, keeping their transactions small.
@@ -39,7 +63,7 @@ tx publish_scripts() {
 
     input funds {
         from: Oracle,
-        min_amount: fees + Ada(deposit) + Ada(deposit),
+        min_amount: fees + Ada(deposit) + Ada(deposit) + Ada(deposit),
     }
 
     cardano::publish {
@@ -56,9 +80,16 @@ tx publish_scripts() {
         script: oracle_script,
     }
 
+    cardano::publish {
+        to: Oracle,
+        amount: Ada(deposit),
+        version: 3,
+        script: escrow_script,
+    }
+
     output change {
         to: Oracle,
-        amount: funds - Ada(deposit) - Ada(deposit) - fees,
+        amount: funds - Ada(deposit) - Ada(deposit) - Ada(deposit) - fees,
     }
 }
 
@@ -164,5 +195,145 @@ tx consume_oracle_data(
     collateral {
         from: Consumer,
         min_amount: fees,
+    }
+}
+
+// E-commerce escrow template: buyer locks ADA for one order/shipment pair.
+tx lock_escrow_ada(
+    quantity: Int,
+    buyer_pkh: Bytes,
+    merchant_pkh: Bytes,
+    order_id: Bytes,
+    carrier_hash: Bytes,
+    tracking_number_hash: Bytes,
+    paid_at: Int,
+    refund_after: Int,
+) {
+    input source {
+        from: Buyer,
+        min_amount: Ada(quantity) + fees + min_utxo(change),
+    }
+
+    output escrow_output {
+        to: Escrow,
+        amount: Ada(quantity),
+        datum: EscrowDatum {
+            buyer: buyer_pkh,
+            merchant: merchant_pkh,
+            order_id: order_id,
+            carrier_hash: carrier_hash,
+            tracking_number_hash: tracking_number_hash,
+            paid_at: paid_at,
+            refund_after: refund_after,
+        },
+    }
+
+    output change {
+        to: Buyer,
+        amount: source - Ada(quantity) - fees,
+    }
+
+    signers {
+        Buyer,
+    }
+}
+
+// Release escrow to the merchant once the Shipping Oracle signs DELIVERED for
+// the shipment hashes stored in the escrow datum. The escrow validator verifies
+// the oracle signature against the governance UTxO reference input.
+tx release_escrow(
+    escrow_utxo: UtxoRef,
+    p_carrier_hash: Bytes,
+    p_tracking_number_hash: Bytes,
+    p_status: Bytes,
+    p_timestamp: Int,
+    p_signature: Bytes,
+) {
+    locals {
+        oracle_data: OracleData {
+            carrier_hash: p_carrier_hash,
+            tracking_number_hash: p_tracking_number_hash,
+            status: p_status,
+            timestamp: p_timestamp,
+        },
+    }
+
+    reference governance {
+        ref: governance_utxo_ref,
+        datum_is: GovernanceDatum,
+    }
+
+    reference escrow_script_ref_input {
+        ref: escrow_script_ref,
+    }
+
+    input gas {
+        from: Merchant,
+        min_amount: min_utxo(change) + fees,
+    }
+
+    input locked {
+        from: Escrow,
+        ref: escrow_utxo,
+        datum_is: EscrowDatum,
+        redeemer: EscrowRedeemer::Release {
+            data: oracle_data,
+            signature: p_signature,
+        },
+    }
+
+    collateral {
+        from: Merchant,
+        min_amount: fees,
+    }
+
+    output change {
+        to: Merchant,
+        amount: gas + locked - fees,
+    }
+
+    signers {
+        Merchant,
+    }
+}
+
+// Refund escrow to the buyer after the timeout stored in the escrow datum.
+// The validator enforces that the transaction has a finite lower validity bound
+// at or after `EscrowDatum.refund_after`.
+tx refund_escrow(
+    escrow_utxo: UtxoRef,
+) {
+    validity {
+        since_slot: tip_slot(),
+    }
+
+    reference escrow_script_ref_input {
+        ref: escrow_script_ref,
+    }
+
+    input gas {
+        from: Buyer,
+        min_amount: fees,
+    }
+
+    input locked {
+        from: Escrow,
+        ref: escrow_utxo,
+        datum_is: EscrowDatum,
+        redeemer: EscrowRedeemer::Refund {},
+    }
+
+    collateral {
+        from: Buyer,
+        min_amount: fees,
+    }
+
+    output refund {
+        to: Buyer,
+        amount: gas + locked - fees,
+    }
+
+    signers {
+        Buyer,
     }
 }

@@ -34,7 +34,9 @@ The validator runs as `withdraw` so consumers attach it via a 0-lovelace withdra
 
 - `validators/governance_nft.ak` — one-shot minting policy. Guarantees the governance NFT is unforgeable by requiring consumption of `seed_utxo_*`.
 - `validators/oracle.ak` — withdrawal validator. Verifies the Ed25519 signature carried in `OracleRedeemer` against the `oracle_vk` stored in the governance UTxO datum.
+- `validators/escrow.ak` — ADA escrow validator. Releases funds to the merchant when the oracle signs `DELIVERED` for the escrow shipment hashes, or refunds the buyer after timeout.
 - `lib/types.ak` — shared types (`GovernanceDatum`, `OracleData`, `OracleRedeemer`) and the on-chain status vocabulary (`DELIVERED`, `NOT_DELIVERED`, `IN_TRANSIT`, `PRE_TRANSIT`, `UNKNOWN`).
+- `lib/oracle_verification.ak` — shared governance UTxO lookup and Ed25519 verification helper used by both `oracle.ak` and `escrow.ak`.
 - `lib/cbor_alignment_tests.ak` — pinned CBOR vectors that must stay byte-identical to `backend/tests/cbor_alignment.rs`. Locks in `builtin.serialise_data(OracleData) == minicbor::to_vec(PlutusData)`.
 - `aiken.toml` — project metadata + the `[config.default]` block consumed by both validators.
 
@@ -81,6 +83,7 @@ aiken check -m governance_nft  # mint policy
 Coverage:
 
 - `oracle.ak`: `withdraw_valid_signature`, `withdraw_invalid_signature`, `withdraw_tampered_data`, `withdraw_missing_governance_nft`.
+- `escrow.ak`: `release_valid_delivered_signature`, `release_rejects_non_delivered_status`, `release_rejects_wrong_payout`, `refund_valid_after_timeout`, `refund_rejects_before_timeout`.
 - `governance_nft.ak`: `mint_valid`, `mint_missing_seed_input`, `mint_wrong_asset_name`, `mint_wrong_quantity`, `mint_extra_asset`.
 - `cbor_alignment_tests.ak`: three pinned CBOR vectors checked against the matching Rust tests in `backend/tests/cbor_alignment.rs`. Update both files together.
 
@@ -94,6 +97,7 @@ After a successful `aiken build` the validators are emitted to `onchain/plutus.j
 |---|---|---|
 | `governance_nft.governance_nft.mint` | minting policy | inlined by `bootstrap_governance` |
 | `oracle.oracle.withdraw` | withdrawal validator | published as a reference script by `publish_scripts`, attached by `consume_oracle_data` |
+| `escrow.escrow.spend` | spending validator | published as a reference script by `publish_scripts`, attached by `release_escrow` / `refund_escrow` |
 
 ## License
 

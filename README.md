@@ -52,6 +52,20 @@ It wraps the current oracle HTTP contract and gives consumers a typed flow for:
 - generating tx3-ready `consume_oracle_data` arguments
 - keeping application context such as `order_id` linked to the resulting shipment commitment
 
+The SDK also includes end-to-end examples that write tx3 args JSON for the local `trix` devnet flow: [`sdk/rust/examples/e2e_consume_oracle.rs`](sdk/rust/examples/e2e_consume_oracle.rs) for oracle consumption and [`sdk/rust/examples/e2e_escrow_flow.rs`](sdk/rust/examples/e2e_escrow_flow.rs) for escrow lock/release/refund.
+
+## Escrow Template
+
+Milestone 3 adds an ADA-only e-commerce escrow template:
+
+- `lock_escrow_ada` locks buyer ADA against an order id and shipment hashes.
+- `release_escrow` releases funds to the merchant only when the oracle signs `DELIVERED` for that shipment.
+- `refund_escrow` refunds the buyer after timeout.
+
+The on-chain escrow validator is [`onchain/validators/escrow.ak`](onchain/validators/escrow.ak), and the tx3 templates live in [`tx3/main.tx3`](tx3/main.tx3).
+
+See [`TESTING.md`](TESTING.md#59-escrow-template-transactions) for the executable escrow walkthrough.
+
 ## HTTP API
 
 ### `GET /v1/shipment`

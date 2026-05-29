@@ -94,12 +94,114 @@ pub struct ConsumeOracleDataArgsJson {
     pub p_signature: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ReleaseEscrowArgsJson {
+    pub escrow_utxo: String,
+    pub p_carrier_hash: String,
+    pub p_tracking_number_hash: String,
+    pub p_status: String,
+    pub p_timestamp: i64,
+    pub p_signature: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct LockEscrowAdaArgsJson {
+    pub quantity: i64,
+    pub buyer_pkh: String,
+    pub merchant_pkh: String,
+    pub order_id: String,
+    pub carrier_hash: String,
+    pub tracking_number_hash: String,
+    pub paid_at: i64,
+    pub refund_after: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RefundEscrowArgsJson {
+    pub escrow_utxo: String,
+}
+
+impl ReleaseEscrowArgsJson {
+    pub fn as_json_string(&self) -> String {
+        serde_json::to_string_pretty(self).expect("json serialization must succeed")
+    }
+
+    pub fn write_to_path(&self, path: impl AsRef<std::path::Path>) -> std::io::Result<()> {
+        std::fs::write(path, self.as_json_string())
+    }
+}
+
+impl LockEscrowAdaArgsJson {
+    pub fn as_json_string(&self) -> String {
+        serde_json::to_string_pretty(self).expect("json serialization must succeed")
+    }
+
+    pub fn write_to_path(&self, path: impl AsRef<std::path::Path>) -> std::io::Result<()> {
+        std::fs::write(path, self.as_json_string())
+    }
+}
+
+impl RefundEscrowArgsJson {
+    pub fn as_json_string(&self) -> String {
+        serde_json::to_string_pretty(self).expect("json serialization must succeed")
+    }
+
+    pub fn write_to_path(&self, path: impl AsRef<std::path::Path>) -> std::io::Result<()> {
+        std::fs::write(path, self.as_json_string())
+    }
+}
+
 impl ConsumeOracleDataArgsJson {
     pub fn as_json_string(&self) -> String {
         serde_json::to_string_pretty(self).expect("json serialization must succeed")
+    }
+
+    pub fn write_to_path(&self, path: impl AsRef<std::path::Path>) -> std::io::Result<()> {
+        std::fs::write(path, self.as_json_string())
     }
 }
 
 pub fn cbor_bytes(attestation: &OracleAttestation) -> Result<Vec<u8>, OracleSdkError> {
     decode_hex("cbor_hex", &attestation.cbor_hex)
+}
+
+pub fn release_escrow_args_json(
+    escrow_utxo: impl Into<String>,
+    attestation: &OracleAttestation,
+) -> ReleaseEscrowArgsJson {
+    ReleaseEscrowArgsJson {
+        escrow_utxo: escrow_utxo.into(),
+        p_carrier_hash: attestation.data.carrier_hash.clone(),
+        p_tracking_number_hash: attestation.data.tracking_number_hash.clone(),
+        p_status: hex::encode(attestation.data.status.as_bytes()),
+        p_timestamp: attestation.data.timestamp,
+        p_signature: attestation.signature.clone(),
+    }
+}
+
+pub fn lock_escrow_ada_args_json(
+    quantity: i64,
+    buyer_pkh: impl Into<String>,
+    merchant_pkh: impl Into<String>,
+    order_id: impl AsRef<str>,
+    paid_at: i64,
+    refund_after: i64,
+    attestation: &OracleAttestation,
+) -> LockEscrowAdaArgsJson {
+    LockEscrowAdaArgsJson {
+        quantity,
+        buyer_pkh: buyer_pkh.into(),
+        merchant_pkh: merchant_pkh.into(),
+        order_id: hex::encode(order_id.as_ref().as_bytes()),
+        carrier_hash: attestation.data.carrier_hash.clone(),
+        tracking_number_hash: attestation.data.tracking_number_hash.clone(),
+        paid_at,
+        refund_after,
+    }
+}
+
+pub fn refund_escrow_args_json(escrow_utxo: impl Into<String>) -> RefundEscrowArgsJson {
+    RefundEscrowArgsJson {
+        escrow_utxo: escrow_utxo.into(),
+    }
 }

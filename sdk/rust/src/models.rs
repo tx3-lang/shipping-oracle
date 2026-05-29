@@ -3,7 +3,11 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 
 use crate::error::OracleSdkError;
-use crate::tx3::{ConsumeOracleDataArgsJson, ConsumeOracleDataParams};
+use crate::tx3::{
+    ConsumeOracleDataArgsJson, ConsumeOracleDataParams, LockEscrowAdaArgsJson,
+    RefundEscrowArgsJson, ReleaseEscrowArgsJson, lock_escrow_ada_args_json,
+    refund_escrow_args_json, release_escrow_args_json,
+};
 use crate::verify::{decode_array, verify_attestation};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -109,6 +113,33 @@ impl OracleAttestation {
     pub fn to_cli_args_json(&self) -> Result<ConsumeOracleDataArgsJson, OracleSdkError> {
         Ok(self.to_consume_oracle_data_params()?.to_cli_args_json())
     }
+
+    pub fn to_release_escrow_args_json(
+        &self,
+        escrow_utxo: impl Into<String>,
+    ) -> ReleaseEscrowArgsJson {
+        release_escrow_args_json(escrow_utxo, self)
+    }
+
+    pub fn to_lock_escrow_ada_args_json(
+        &self,
+        quantity: i64,
+        buyer_pkh: impl Into<String>,
+        merchant_pkh: impl Into<String>,
+        order_id: impl AsRef<str>,
+        paid_at: i64,
+        refund_after: i64,
+    ) -> LockEscrowAdaArgsJson {
+        lock_escrow_ada_args_json(
+            quantity,
+            buyer_pkh,
+            merchant_pkh,
+            order_id,
+            paid_at,
+            refund_after,
+            self,
+        )
+    }
 }
 
 #[derive(Debug)]
@@ -149,6 +180,39 @@ impl<TContext> PreparedCommitment<TContext> {
 
     pub fn to_cli_args_json(&self) -> Result<ConsumeOracleDataArgsJson, OracleSdkError> {
         self.attestation.to_cli_args_json()
+    }
+
+    pub fn to_release_escrow_args_json(
+        &self,
+        escrow_utxo: impl Into<String>,
+    ) -> ReleaseEscrowArgsJson {
+        self.attestation.to_release_escrow_args_json(escrow_utxo)
+    }
+
+    pub fn to_lock_escrow_ada_args_json(
+        &self,
+        quantity: i64,
+        buyer_pkh: impl Into<String>,
+        merchant_pkh: impl Into<String>,
+        order_id: impl AsRef<str>,
+        paid_at: i64,
+        refund_after: i64,
+    ) -> LockEscrowAdaArgsJson {
+        self.attestation.to_lock_escrow_ada_args_json(
+            quantity,
+            buyer_pkh,
+            merchant_pkh,
+            order_id,
+            paid_at,
+            refund_after,
+        )
+    }
+
+    pub fn to_refund_escrow_args_json(
+        &self,
+        escrow_utxo: impl Into<String>,
+    ) -> RefundEscrowArgsJson {
+        refund_escrow_args_json(escrow_utxo)
     }
 
     pub fn into_parts(self) -> (TContext, OracleAttestation) {

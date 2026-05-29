@@ -107,6 +107,9 @@ Supported conversions:
 
 - `to_consume_oracle_data_params()` for programmatic tx3 integration
 - `to_cli_args_json()` for `trix invoke --args-json-path ...`
+- `to_lock_escrow_ada_args_json(...)` for the ADA escrow `lock_escrow_ada` template
+- `to_release_escrow_args_json(escrow_utxo)` for the ADA escrow `release_escrow` template
+- `to_refund_escrow_args_json(escrow_utxo)` for the ADA escrow `refund_escrow` template
 
 The CLI args JSON looks like:
 
@@ -141,12 +144,84 @@ Run the examples against a local backend:
 cd sdk/rust
 cargo run --example raw_attestation
 cargo run --example order_commitment
+cargo run --example e2e_consume_oracle
+cargo run --example e2e_escrow_flow
 ```
 
 Optional environment variables:
 
 - `ORACLE_BASE_URL` defaults to `http://127.0.0.1:3000`
 - `ORACLE_PUBLIC_KEY` pins the expected oracle verification key
+- `SHIPMENT_CARRIER` defaults to `shippo`
+- `SHIPMENT_TRACKING_NUMBER` defaults to `SHIPPO_DELIVERED`
+- `ORDER_ID` defaults to `ord_demo_123`
+- `TX3_ARGS_OUT` defaults to `/tmp/consume_args.json`
+- `TRIX_PROFILE` defaults to `local`
+
+The escrow example also accepts:
+
+- `BUYER_PKH` required, 28-byte buyer payment key hash hex
+- `MERCHANT_PKH` required, 28-byte merchant payment key hash hex
+- `ESCROW_LOVELACE` defaults to `10000000`
+- `PAID_AT` defaults to the oracle attestation timestamp
+- `REFUND_AFTER` defaults to `PAID_AT + 604800`
+- `ESCROW_UTXO` enables release/refund arg generation for an already locked escrow
+- `LOCK_ESCROW_ARGS_OUT` defaults to `/tmp/lock_escrow_ada_args.json`
+- `RELEASE_ESCROW_ARGS_OUT` defaults to `/tmp/release_escrow_args.json`
+- `REFUND_ESCROW_ARGS_OUT` defaults to `/tmp/refund_escrow_args.json`
+
+## End-To-End Devnet Example
+
+Once the backend is running and `tx3` is configured for the local devnet, the SDK can replace the manual `curl` and `jq` step used to build consumer transaction arguments:
+
+```bash
+cd sdk/rust
+ORACLE_BASE_URL=http://127.0.0.1:3000 \
+ORDER_ID=ord_123 \
+TX3_ARGS_OUT=/tmp/consume_args.json \
+cargo run --example e2e_consume_oracle
+
+cd ../../tx3
+trix invoke -p local --args-json-path /tmp/consume_args.json
+```
+
+The example:
+
+- fetches the shipment attestation from the oracle
+- verifies the response before using it
+- links it to an application-level `order_id`
+- writes the exact JSON args file expected by `consume_oracle_data`
+
+This is the SDK-backed version of the local end-to-end consumer flow.
+
+## Escrow Release Args
+
+The Milestone 3 ADA escrow template uses the same oracle attestation to release funds to the merchant. Once an app knows the escrow UTxO reference, it can derive the tx3 args for `release_escrow` directly:
+
+```rust
+let release_args = commitment.to_release_escrow_args_json(
+    "<escrow_tx_hash>#<output_index>",
+);
+release_args.write_to_path("/tmp/release_escrow_args.json")?;
+```
+
+Then submit via tx3:
+
+```bash
+cd tx3
+trix invoke -p local --args-json-path /tmp/release_escrow_args.json
+```
+
+For the complete lock/release/refund walkthrough, run:
+
+```bash
+cd sdk/rust
+BUYER_PKH=<28-byte buyer payment key hash hex> \
+MERCHANT_PKH=<28-byte merchant payment key hash hex> \
+cargo run --example e2e_escrow_flow
+```
+
+Then follow the generated `trix invoke` commands. After the lock transaction, rerun the example with `ESCROW_UTXO=<lock_tx_hash>#<output_index>` to write `release_escrow` and `refund_escrow` args.
 
 ## Tests And Evidence
 

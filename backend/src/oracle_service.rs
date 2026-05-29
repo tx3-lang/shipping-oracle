@@ -1,10 +1,8 @@
 use anyhow::{Context, Result, bail};
-use blake2::{Blake2b, digest::consts::U32, Digest};
+use blake2::{Blake2b, Digest, digest::consts::U32};
 use ed25519_dalek::{Signer, SigningKey};
 use pallas::codec::minicbor;
-use pallas::ledger::primitives::{
-    BigInt, BoundedBytes, Constr, Int, MaybeIndefArray, PlutusData,
-};
+use pallas::ledger::primitives::{BigInt, BoundedBytes, Constr, Int, MaybeIndefArray, PlutusData};
 
 use crate::models::{OracleData, ShipmentPlaintext, SignedOracleResponse};
 use crate::shipment::{self, ShipmentClient};

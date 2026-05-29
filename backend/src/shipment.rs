@@ -38,7 +38,10 @@ impl ShipmentClient {
         let response = self
             .http_client
             .get(&url)
-            .header("Authorization", format!("ShippoToken {}", self.shippo_api_key))
+            .header(
+                "Authorization",
+                format!("ShippoToken {}", self.shippo_api_key),
+            )
             .send()
             .await
             .context("failed to send request to Shippo")?;
@@ -49,8 +52,10 @@ impl ShipmentClient {
             anyhow::bail!("Shippo query failed (status {status}): {body}");
         }
 
-        let tracking: TrackingResponse =
-            response.json().await.context("failed to parse Shippo response")?;
+        let tracking: TrackingResponse = response
+            .json()
+            .await
+            .context("failed to parse Shippo response")?;
 
         Ok(tracking.tracking_status)
     }

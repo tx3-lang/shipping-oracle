@@ -14,6 +14,21 @@ pub type OracleRedeemer {
   signature: ByteArray,
 }
 
+pub type EscrowDatum {
+  buyer: ByteArray,
+  merchant: ByteArray,
+  order_id: ByteArray,
+  carrier_hash: ByteArray,
+  tracking_number_hash: ByteArray,
+  paid_at: Int,
+  refund_after: Int,
+}
+
+pub type EscrowRedeemer {
+  Release { data: OracleData, signature: ByteArray }
+  Refund
+}
+
 pub const status_delivered: ByteArray = "DELIVERED"
 
 pub const status_not_delivered: ByteArray = "NOT_DELIVERED"

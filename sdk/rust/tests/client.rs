@@ -39,6 +39,55 @@ async fn prepare_commitment_links_context_and_tx3_args() {
         .expect("tx3 cli args should be available");
     assert_eq!(tx_args.p_status, hex::encode("DELIVERED"));
     assert_eq!(tx_args.p_signature, commitment.attestation.signature);
+
+    let args_path = std::env::temp_dir().join(format!(
+        "shipping-oracle-sdk-{}-consume_args.json",
+        std::process::id()
+    ));
+    tx_args
+        .write_to_path(&args_path)
+        .expect("args json should be written");
+    let written = std::fs::read_to_string(&args_path).expect("args json should be readable");
+    assert!(written.contains("p_tracking_number_hash"));
+    assert!(written.contains(&tx_args.p_status));
+    let _ = std::fs::remove_file(args_path);
+
+    let release_args = commitment.to_release_escrow_args_json(
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa#0",
+    );
+    assert_eq!(release_args.p_status, hex::encode("DELIVERED"));
+    assert_eq!(release_args.p_signature, commitment.attestation.signature);
+    assert_eq!(
+        release_args.escrow_utxo,
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa#0"
+    );
+
+    let lock_args = commitment.to_lock_escrow_ada_args_json(
+        10_000_000,
+        "11111111111111111111111111111111111111111111111111111111",
+        "22222222222222222222222222222222222222222222222222222222",
+        "order-123",
+        1_712_000_000,
+        1_713_000_000,
+    );
+    assert_eq!(lock_args.quantity, 10_000_000);
+    assert_eq!(lock_args.order_id, hex::encode("order-123"));
+    assert_eq!(
+        lock_args.carrier_hash,
+        commitment.attestation.data.carrier_hash
+    );
+    assert_eq!(
+        lock_args.tracking_number_hash,
+        commitment.attestation.data.tracking_number_hash
+    );
+
+    let refund_args = commitment.to_refund_escrow_args_json(
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa#0",
+    );
+    assert_eq!(
+        refund_args.escrow_utxo,
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa#0"
+    );
 }
 
 #[tokio::test]

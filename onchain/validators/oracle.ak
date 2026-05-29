@@ -1,12 +1,10 @@
-use aiken/builtin
-use aiken/collection/list
-use aiken/crypto
 use cardano/address.{Credential, VerificationKey}
 use cardano/assets
 use cardano/transaction.{
   InlineDatum, Input, NoDatum, Output, OutputReference, Transaction,
 }
 use config
+use oracle_verification
 use types.{GovernanceDatum, OracleData, OracleRedeemer}
 
 // Oracle withdrawal validator. Runs under the `withdraw` purpose so consumers
@@ -21,21 +19,7 @@ use types.{GovernanceDatum, OracleData, OracleRedeemer}
 
 validator oracle {
   withdraw(redeemer: OracleRedeemer, _account: Credential, tx: Transaction) {
-    expect Some(gov_input) =
-      list.find(
-        tx.reference_inputs,
-        fn(input) {
-          assets.quantity_of(
-            input.output.value,
-            config.gov_policy_id,
-            config.governance_asset_name,
-          ) == 1
-        },
-      )
-    expect InlineDatum(gov_data) = gov_input.output.datum
-    expect gov: GovernanceDatum = gov_data
-    let message = builtin.serialise_data(redeemer.data)
-    crypto.verify_ed25519_signature(gov.oracle_vk, message, redeemer.signature)
+    oracle_verification.verify(tx, redeemer.data, redeemer.signature)
   }
 
   else(_) {
