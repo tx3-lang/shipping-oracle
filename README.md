@@ -34,11 +34,23 @@ Sources: [`diagrams/milestone-2-c4-container.puml`](diagrams/milestone-2-c4-cont
 ```
 shipping-oracle/
 ├── backend/          # Rust HTTP oracle (axum + pallas + ed25519-dalek)
+├── sdk/              # Consumer SDKs (Rust SDK currently available)
 ├── onchain/          # Aiken validators (governance_nft mint + oracle withdraw)
 ├── tx3/              # TX3 protocol (publish_scripts, bootstrap_governance, consume_oracle_data)
 ├── diagrams/         # PlantUML C4 + sequence diagrams (sources + PNGs)
 └── spec/             # Numbered implementation specs
 ```
+
+## SDKs
+
+The first Milestone 3 SDK lives in [`sdk/rust`](sdk/rust/README.md).
+
+It wraps the current oracle HTTP contract and gives consumers a typed flow for:
+
+- fetching `GET /v1/shipment` attestations
+- verifying the Ed25519 signature and canonical CBOR payload
+- generating tx3-ready `consume_oracle_data` arguments
+- keeping application context such as `order_id` linked to the resulting shipment commitment
 
 ## HTTP API
 
@@ -126,6 +138,10 @@ cargo test             # backend/tests/*.rs + backend/tests/cbor_alignment.rs
 cp .env.example .env   # fill ORACLE_SK, SHIPPO_API_KEY, TRP_URL, ...
 cargo run
 curl 'http://localhost:3000/v1/shipment?carrier=usps&tracking_number=...'
+
+# 4. SDK: run the Rust SDK tests and examples
+cd ../sdk/rust
+cargo test --all-targets -- --nocapture
 ```
 
 ### Required env

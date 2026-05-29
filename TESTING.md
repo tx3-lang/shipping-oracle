@@ -11,6 +11,7 @@ Runbook for reproducing every test in the project, from unit tests up to a full 
 | 3 | On-chain unit tests (Aiken) | `aiken check` | none | ~2 s |
 | 4 | On-chain build (two-pass) | `aiken build` ×2 | none | ~5 s |
 | 5 | End-to-end on local devnet | `trix devnet` + tx3 | local Dolos (no testnet needed) | ~1 min |
+| 6 | Rust SDK consumer flow | `cd sdk/rust && cargo test --all-targets -- --nocapture` | none (backend + Shippo stubbed) | ~10 s |
 
 ---
 
@@ -218,6 +219,23 @@ trix tx <txhash>                # tx details
 ```
 
 If the signature doesn't validate, the script fails and the tx is rejected by the node — that's the on-chain smoke test.
+
+---
+
+## 6. Rust SDK tests
+
+```bash
+cd sdk/rust
+cargo test --all-targets -- --nocapture
+```
+
+The SDK suite spins up the existing backend server logic locally, stubs Shippo via `wiremock`, and verifies the consumer-side flow end-to-end:
+
+- `tests/client.rs` checks health, typed fetches, and context-linked commitment preparation.
+- `tests/verification.rs` checks expected-key pinning and tamper detection.
+- `tests/report.rs` writes `sdk/rust/reports/sdk-integration.{json,md}` with tx3-ready args for every supported status path plus the upstream-error case.
+
+CI uploads both report files as workflow artifacts from `.github/workflows/sdk.yml`.
 
 ---
 
