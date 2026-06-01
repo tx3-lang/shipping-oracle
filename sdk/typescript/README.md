@@ -157,7 +157,7 @@ Run the example against a local backend:
 
 ```bash
 cd sdk/typescript
-pnpm exec tsx examples/order-commitment.ts
+pnpx tsx examples/order-commitment.ts
 ```
 
 Optional environment variables:
