@@ -1,0 +1,4 @@
+# pnpm 11 reads build-script approvals from here.
+# esbuild (a vitest dependency) needs its postinstall to run.
+allowBuilds:
+  esbuild: true
