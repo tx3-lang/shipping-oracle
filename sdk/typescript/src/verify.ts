@@ -111,7 +111,17 @@ export function verifyAttestation(
   }
 
   // ── Step 3: Re-encode data and compare to cbor_hex ────────────────────────
-  const reencoded = encodeOracleDataCbor(attestation.data);
+  // encodeOracleDataCbor → hexToBytes throws a raw Error on malformed hash hex;
+  // surface it as OracleSdkError so every failure mode stays typed.
+  let reencoded: Uint8Array;
+  try {
+    reencoded = encodeOracleDataCbor(attestation.data);
+  } catch {
+    throw new OracleSdkError(
+      "CBOR_MISMATCH",
+      "data fields could not be re-encoded (invalid hash hex?)"
+    );
+  }
   if (reencoded.length !== cborBytes.length) {
     throw new OracleSdkError("CBOR_MISMATCH", "Re-encoded CBOR does not match cbor_hex");
   }

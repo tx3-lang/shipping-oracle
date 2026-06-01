@@ -12,6 +12,8 @@
  *   pnpm exec tsx examples/order-commitment.ts
  */
 
+// In-repo example imports from source. In your own project, import from the
+// package instead: `import { OracleClient } from "shipping-oracle-sdk";`
 import { OracleClient } from "../src/index.js";
 
 interface OrderContext {

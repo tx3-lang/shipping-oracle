@@ -102,6 +102,24 @@ describe("verifyAttestation", () => {
     expect((error as OracleSdkError).code).toBe("TRACKING_NUMBER_HASH_MISMATCH");
   });
 
+  it("throws CBOR_MISMATCH (typed) when a hash field is not valid hex", () => {
+    const att = buildSignedAttestation();
+    // Invalid hex in carrier_hash: re-encoding throws inside hexToBytes; it must
+    // surface as a typed OracleSdkError, not a raw Error.
+    const corrupted = {
+      ...att,
+      data: { ...att.data, carrier_hash: "zz".repeat(32) },
+    };
+    let error: unknown;
+    try {
+      verifyAttestation(corrupted);
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(OracleSdkError);
+    expect((error as OracleSdkError).code).toBe("CBOR_MISMATCH");
+  });
+
   it("throws INVALID_LENGTH for a public key that is not 32 bytes", () => {
     const att = buildSignedAttestation();
     const corrupted = { ...att, public_key: "aabbcc" }; // only 3 bytes
