@@ -133,9 +133,10 @@ Reminders:
 
 ```bash
 cd tx3
-trix devnet start
-trix devnet info     # shows pre-funded wallets (alice/bob/charlie)
+trix devnet          # runs in the foreground; add -b to run it in the background
 ```
+
+`trix devnet` is not a daemon — by default it stays attached to the terminal, so leave it running and use a second terminal (or start it with `trix devnet -b`). There is no `trix devnet info`; the pre-funded wallets are `alice`/`bob`/`charlie`, and you inspect any of them with `trix identities <name> ...`.
 
 `devnet.toml` defines pre-funded UTxOs for `@alice`, `@bob`, `@charlie` (100k ADA each).
 
