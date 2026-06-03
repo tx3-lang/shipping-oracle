@@ -56,6 +56,10 @@ Both wrap the oracle HTTP contract and give consumers a typed flow for:
 
 The Rust SDK additionally generates tx3-ready `consume_oracle_data` arguments.
 
+## Escrow integration example
+
+A runnable end-to-end example — an off-chain keeper that drives a deployed Cardano escrow from this oracle's `IN_TRANSIT` / `DELIVERED` signals — lives in the [tx3 e-commerce template](https://github.com/tx3-lang/tx3-ecommerce-template). See its [Oracle-Driven Escrow Settlement integration guide](https://github.com/tx3-lang/tx3-ecommerce-template/blob/main/docs/integration-escrow.md) for the full flow, trust model, the `IN_TRANSIT → mark_shipped` / `DELIVERED → release` mapping, the buyer-initiated refund rationale, and how to run the keeper.
+
 ## HTTP API
 
 ### `GET /v1/shipment`

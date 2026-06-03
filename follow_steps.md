@@ -93,11 +93,12 @@ Spin up a local Cardano devnet via trix. From the repo root:
 
 ```bash
 cd tx3
-trix devnet start
-trix devnet info       # shows pre-funded wallets
+trix devnet         # runs in the foreground; add -b to run it in the background
 ```
 
-Pick a wallet from `trix devnet info` for the oracle party (or create one with `cshell wallet create`). Export its signing-key hex into `backend/.env::ORACLE_SK` so the API signs with the same key the on-chain governance UTxO will trust.
+`trix devnet` launches the local Dolos node. It is not a daemon: by default it stays attached to the terminal, so either leave it running and use a second terminal, or start it with `trix devnet -b`. The pre-funded wallets are `alice`, `bob`, and `charlie` (100k ADA each), defined in `tx3/devnet.toml`.
+
+Pick one of those wallets for the oracle party (or create one with `cshell wallet create`). Inspect its identity with `trix identities <name> address-testnet` / `trix identities <name> public-key`, and export the matching signing-key hex into `backend/.env::ORACLE_SK` so the API signs with the same key the on-chain governance UTxO will trust.
 
 Create a `.env.local` next to `tx3/main.tx3` filling the env block from the freshly built `plutus.json`:
 
