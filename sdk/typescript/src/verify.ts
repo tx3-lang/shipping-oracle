@@ -24,7 +24,7 @@ export interface VerifyOptions {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /** Decode a hex string and assert the result is exactly N bytes. */
-function decodeFixed(
+export function decodeFixed(
   fieldName: string,
   hexStr: string,
   expectedLen: number

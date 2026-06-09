@@ -92,6 +92,28 @@ Encodes `OracleData` to canonical CBOR — `Constr 121` with an indefinite-lengt
 array (`d879 9f ... ff`). Produces byte-identical output to Aiken
 `builtin.serialise_data` and the Rust `minicbor` encoder.
 
+### `toConsumeOracleDataArgs(attestation: OracleAttestation): ConsumeOracleDataArgs`
+
+Maps a (verified) attestation into the argument object the tx3
+`consume_oracle_data` transaction expects, so you don't hand-derive the
+parameters. The mapping is byte-identical to the Rust SDK — in particular
+`p_status` is the hex of the UTF-8 status bytes (e.g. `"IN_TRANSIT"` →
+`494e5f5452414e534954`), not the status string. Throws
+`OracleSdkError('INVALID_LENGTH')` if a hash is not 32 bytes or the signature is
+not 64 bytes.
+
+This produces the args only; transaction assembly is handled by tx3 or your
+consuming dApp. Verify the attestation first.
+
+```typescript
+import { OracleClient, toConsumeOracleDataArgs } from "shipping-oracle-sdk";
+
+const commitment = await client.prepareCommitment(ctx, "shippo", "SHIPPO_DELIVERED");
+const args = toConsumeOracleDataArgs(commitment.attestation);
+// → { p_carrier_hash, p_tracking_number_hash, p_status, p_timestamp, p_signature }
+// feed `args` to the tx3 `consume_oracle_data` transaction
+```
+
 ### Types
 
 | Type | Description |

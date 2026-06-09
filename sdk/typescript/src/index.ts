@@ -16,6 +16,10 @@ export type { VerifyOptions } from "./verify.js";
 // ── CBOR encoder ─────────────────────────────────────────────────────────────
 export { encodeOracleDataCbor } from "./cbor.js";
 
+// ── tx3 argument mapping ──────────────────────────────────────────────────────
+export { toConsumeOracleDataArgs } from "./tx3.js";
+export type { ConsumeOracleDataArgs } from "./tx3.js";
+
 // ── Error ─────────────────────────────────────────────────────────────────────
 export { OracleSdkError } from "./error.js";
 export type { OracleSdkErrorCode } from "./error.js";
